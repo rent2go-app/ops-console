@@ -146,6 +146,23 @@
         { key: 'fleet_allocated',     label: 'Fleet Requests Allocated',  aliases: ['fleet requests allocated', 'fleet allocated', 'fleet requests'] },
         { key: 'projects_progressed', label: 'Projects Progressed',       aliases: ['projects progressed', 'project updates'] }
       ]
+    },
+    {
+      // The daily Service Delivery & Maintenance field plan (the "command board"):
+      // jobs and tasks by network discipline. Open to Network Ops AND Core Ops
+      // leaders so field outcomes can be reported by whoever runs the plan.
+      key: 'field', label: 'Network Field Plan', icon: '🗼',
+      outcome: 'Field Delivery & Maintenance',
+      headers: ['network field plan', 'field plan', 'service delivery', 'command board', 'service delivery & maintenance', "today's tasks"],
+      roles: ['network-ops', 'core-ops'],
+      metrics: [
+        { key: 'field_jobs_scheduled', label: 'Jobs Scheduled / Open', aliases: ['jobs scheduled today', 'jobs scheduled', 'total jobs', 'scheduled open', 'jobs open'] },
+        { key: 'field_jobs_completed', label: 'Jobs Completed',        aliases: ['jobs completed', 'completed jobs', 'jobs closed', 'jobs delivered'] },
+        { key: 'fibre_tasks',          label: 'Fibre / Fibre-related', aliases: ['fibre related', 'fibre-related', 'fibre tasks', 'fibre activities', 'fibre optic', 'fibre'] },
+        { key: 'radio_tasks',          label: 'Wimax / LTE / VSat / Radio', aliases: ['wimax / lte / vsat / radio', 'wimax lte vsat radio', 'radio tasks', 'wimax', 'vsat', 'lte', 'radio'] },
+        { key: 'lan_tasks',            label: 'LAN / VoIP',            aliases: ['lan / voip', 'lan voip', 'lan tasks', 'lan', 'voip'] },
+        { key: 'power_tasks',          label: 'Power, Automation & IoT', aliases: ['power, automation & iot', 'power automation iot', 'power tasks', 'power & automation', 'power and automation', 'automation iot'] }
+      ]
     }
   ];
 
@@ -196,6 +213,7 @@
     },
     'network-ops': {
       throughput: [
+        { label: 'Field jobs completed',     keys: ['field_jobs_completed'], target: 6 },
         { label: 'Faults attended / closed', keys: ['faults_attended'], target: 4 },
         { label: 'Tasks cleared',            keys: ['tasks_cleared'], target: 8 },
         { label: 'Installs validated',       keys: ['installs_validated'], target: 4 }
@@ -204,10 +222,8 @@
         { label: 'QA checks',           keys: ['qa_checks', 'qa_evaluations'], target: 5 },
         { label: 'Timesheets validated', keys: ['timesheets_validated'], target: 2 }
       ],
-      value: [
-        { label: 'Fleet allocated',     keys: ['fleet_allocated'], target: 3 },
-        { label: 'Projects progressed', keys: ['projects_progressed'], target: 1 }
-      ]
+      // Network Ops has no revenue Value pillar — score re-weights across the rest.
+      value: []
     },
     'governance': {
       throughput: [

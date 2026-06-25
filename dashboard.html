@@ -145,7 +145,7 @@
     </div>
 
     <div class="card mb">
-      <div class="card__head"><h2>📈 Outcomes by category</h2><span class="sub">team total for the period</span></div>
+      <div class="card__head"><h2>📊 Where the work went</h2><span class="sub">total actions logged in each area · shows effort focus, not a score</span></div>
       <div class="card__body" id="prd-outcomes"></div>
     </div>
 
@@ -414,14 +414,24 @@ function renderProductivity(){
        ${dates.length? `<tr style="font-weight:800;border-top:2px solid var(--border-2);background:var(--bg);"><td>Team total</td>${dCols.map(c=>`<td class="num">${c.money?fmtMoney(c.f(rows)):c.f(rows)}</td>`).join('')}</tr>`:''}
      </tbody>`;
 
-  // ---- outcomes by category (count-based; money metrics excluded) ----
-  const catTotals = O.CATEGORIES.map(c => ({
-    label:c.label, icon:c.icon,
-    total: c.metrics.reduce((s,m)=> s + (m.money?0:sumMetric(rows,m.key)), 0)
-  })).filter(c=>c.total>0).sort((a,b)=>b.total-a.total);
-  const maxCat = Math.max(1,...catTotals.map(c=>c.total));
-  document.getElementById('prd-outcomes').innerHTML = catTotals.length? catTotals.map(c=>bar(c.icon+' '+c.label, c.total, maxCat)).join('')
-    : '<p class="empty">No metric data in this period.</p>';
+  // ---- "Where the work went" — volume per area with a metric breakdown so it's
+  // clear what each bar is made of (money metrics excluded; they're not counts).
+  const catData = O.CATEGORIES.map(c => {
+    const parts = c.metrics.filter(m=>!m.money).map(m=>({label:m.label, v:sumMetric(rows,m.key)})).filter(p=>p.v>0).sort((a,b)=>b.v-a.v);
+    return { label:c.label, icon:c.icon, outcome:c.outcome, total:parts.reduce((s,p)=>s+p.v,0), parts };
+  }).filter(c=>c.total>0).sort((a,b)=>b.total-a.total);
+  const maxCat = Math.max(1,...catData.map(c=>c.total));
+  document.getElementById('prd-outcomes').innerHTML = catData.length ? catData.map(c=>{
+    const breakdown = c.parts.slice(0,5).map(p=>`${p.label} <strong>${p.v}</strong>`).join(' · ') + (c.parts.length>5?' · …':'');
+    return `<div style="margin-bottom:15px;">
+      <div style="display:flex; justify-content:space-between; align-items:baseline; font-size:.88rem;">
+        <span style="font-weight:700;">${c.icon} ${c.label}</span>
+        <span class="muted" style="font-size:.74rem;">${c.outcome} · <strong style="color:var(--text);font-size:.9rem;">${c.total}</strong> actions</span>
+      </div>
+      <div class="bar-track" style="margin:5px 0;"><div class="bar-fill" style="width:${c.total/maxCat*100}%"></div></div>
+      <div class="muted" style="font-size:.74rem;">${breakdown}</div>
+    </div>`;
+  }).join('') : '<p class="empty">No metric data in this period.</p>';
 
   // ---- expected working days (consistency + health) ----
   const effFrom = from==='0000-01-01' ? minDate(rows) : from;
@@ -435,16 +445,20 @@ function renderProductivity(){
   document.getElementById('prd-scorecards').innerHTML = roster.map(p=>{
     const rr = rows.filter(r=>r.name===p.name);
     const s = scoreLeader(rr, p.role, expectedDays);
-    const band = scoreBand(s.total);
+    const naScore = s.total===null;
+    const band = scoreBand(naScore?0:s.total);
     const pills = s.pillars.filter(pl=>pl.has);
+    const sub = !rr.length ? 'no reports in range' : naScore ? 'no metrics reported — not scored' : (rr.length+' report'+(rr.length===1?'':'s'));
     return `<div class="scard">
       <div class="scard__head">
         <span class="avatar" style="background:${avatarColor(p.name)}">${initials(p.fullName)}</span>
-        <div><div style="font-weight:700;">${p.fullName}</div><div class="muted" style="font-size:.74rem;">${O.ROLES[p.role].label} · ${rr.length} report${rr.length===1?'':'s'}</div></div>
-        <span class="scard__score" style="color:${rr.length?band.color:'var(--muted-2)'}">${rr.length? s.total : '—'}</span>
+        <div><div style="font-weight:700;">${p.fullName}</div><div class="muted" style="font-size:.74rem;">${O.ROLES[p.role].label} · ${sub}</div></div>
+        <span class="scard__score" style="color:${(rr.length && !naScore)?band.color:'var(--muted-2)'}">${(rr.length && !naScore)? s.total : '—'}</span>
       </div>
       <div class="scard__body">
-        ${pills.map(pl=>pbar(pl.icon+' '+pl.label, pl.score)).join('')}
+        ${pills.map(pl=> pl.score===null
+            ? `<div class="pbar"><div class="lab">${pl.icon} ${pl.label}</div><div class="bar-track"></div><div class="val">n/a</div></div>`
+            : pbar(pl.icon+' '+pl.label, pl.score)).join('')}
         <div class="ttargets">${pills.flatMap(pl=>pl.items).map(it=>{
           const col = it.pct===null? 'var(--muted-2)' : it.pct>=1?'var(--emerald)':it.pct>=0.5?'var(--amber)':'var(--red)';
           return `<div class="tt"><span><span class="tdot" style="background:${col}"></span>${it.label}</span><span class="muted">${it.display}</span><span style="font-weight:700;color:${col}">${it.pct===null?'n/a':Math.round(it.pct*100)+'%'}</span></div>`;
@@ -459,19 +473,23 @@ function metricSum(rows, keys){ return rows.reduce((s,r)=> s + keys.reduce((a,k)
 function scoreBand(s){ if(s>=75) return {color:'var(--emerald)',label:'strong'}; if(s>=50) return {color:'var(--amber)',label:'fair'}; return {color:'var(--red)',label:'low'}; }
 function pbar(label, score){ const c=scoreBand(score); return `<div class="pbar"><div class="lab">${label}</div><div class="bar-track"><div class="bar-fill" style="width:${score}%;background:${c.color}"></div></div><div class="val">${score}/100</div></div>`; }
 function pillarDetail(rows, defs){
-  const n=rows.length;
   const items=(defs||[]).map(d=>{
     if(d.ratioNum){
       const num=metricSum(rows,d.ratioNum), den=metricSum(rows,d.ratioDen);
       const applicable=den>0, rate=applicable?num/den:0;
-      const pct=applicable? Math.min(1, rate/d.target):null;
-      return {label:d.label, pct, display: applicable? (Math.round(rate*100)+'% / '+Math.round(d.target*100)+'%') : '—'};
+      // ratio is n/a (not penalised) when there's nothing to rate
+      return {label:d.label, pct: applicable? Math.min(1, rate/d.target):null, display: applicable? (Math.round(rate*100)+'% / '+Math.round(d.target*100)+'%') : 'n/a'};
     }
-    const actual=metricSum(rows,d.keys), tgt=d.target*Math.max(1,n);
+    // Only count days the metric was actually REPORTED — a blank field is n/a,
+    // never a 0 that drags the score down. (An explicit 0 still counts.)
+    const appliedDays = rows.filter(r => d.keys.some(k => typeof (r.metrics||{})[k]==='number')).length;
+    if (appliedDays===0) return {label:d.label, pct:null, display:'n/a'};
+    const actual=metricSum(rows,d.keys), tgt=d.target*appliedDays;
     return {label:d.label, pct:Math.min(1, actual/tgt), display:(d.money?fmtMoney(actual):actual)+' / '+(d.money?fmtMoney(tgt):tgt)};
   });
   const valid=items.filter(i=>i.pct!==null);
-  const score=(!n||!valid.length)?0:Math.round(valid.reduce((s,i)=>s+i.pct,0)/valid.length*100);
+  // null score => pillar has no reported data, so it's excluded from the total
+  const score = valid.length? Math.round(valid.reduce((s,i)=>s+i.pct,0)/valid.length*100) : null;
   return {score, items};
 }
 function timelinessDetail(rows, expectedDays){
@@ -496,8 +514,13 @@ function scoreLeader(rows, role, expectedDays){
     Object.assign({key:'timeliness',label:'Timeliness',icon:'🕘',w:W.timeliness,has:true}, timelinessDetail(rows, expectedDays)),
     Object.assign({key:'value',label:'Value',icon:'💰',w:W.value,has:(sc.value||[]).length>0}, pillarDetail(rows, sc.value))
   ];
-  const active=pillars.filter(p=>p.has), wsum=active.reduce((s,p)=>s+p.w,0)||1;
-  const total=rows.length? Math.round(active.reduce((s,p)=>s+p.score*p.w,0)/wsum):0;
+  // exclude pillars with no reported data (score===null) — don't penalise empties
+  const active=pillars.filter(p=>p.has && p.score!==null);
+  const ops=active.filter(p=>p.key!=='timeliness');   // operational pillars
+  let total;
+  if (!rows.length) total = 0;
+  else if (!ops.length) total = null;   // only timeliness reported -> not enough to score (n/a, not 0 or 100)
+  else { const wsum=active.reduce((s,p)=>s+p.w,0)||1; total = Math.round(active.reduce((s,p)=>s+p.score*p.w,0)/wsum); }
   return {total, pillars};
 }
 function renderTeamHealth(rows, roster, expectedDays){
@@ -508,7 +531,7 @@ function renderTeamHealth(rows, roster, expectedDays){
   const resolution=(resolved+escalated)? resolved/(resolved+escalated):null;
   // Collections discipline = average of leaders' Value-pillar attainment
   // (activity & discipline, NOT $ collected).
-  let vScores=[]; roster.forEach(p=>{ const rr=rows.filter(r=>r.name===p.name); if(!rr.length) return; const vd=(O.ROLE_SCORECARD[p.role]||{}).value; if(vd&&vd.length) vScores.push(pillarDetail(rr,vd).score); });
+  let vScores=[]; roster.forEach(p=>{ const rr=rows.filter(r=>r.name===p.name); if(!rr.length) return; const vd=(O.ROLE_SCORECARD[p.role]||{}).value; if(vd&&vd.length){ const sc=pillarDetail(rr,vd).score; if(sc!==null) vScores.push(sc); } });
   const collDiscipline = vScores.length? (vScores.reduce((a,b)=>a+b,0)/vScores.length)/100 : null;
   const comps=[
     {label:'Submission rate', w:0.25, pct:submissionRate, detail:reports+(expected?' / '+expected:'')+' reports'},
