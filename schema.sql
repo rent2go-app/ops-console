@@ -45,6 +45,29 @@ create policy "ops anon update" on ops_reports for update to anon, authenticated
 create policy "ops anon delete" on ops_reports for delete to anon, authenticated using (true);
 
 -- ----------------------------------------------------------------------------
+-- Absences / leave — the admin marks a leader absent or on leave for a date so
+-- they don't show as "Missing" on the tracker.
+-- ----------------------------------------------------------------------------
+create table if not exists ops_absences (
+  id           uuid default gen_random_uuid() primary key,
+  name         text not null,
+  absence_date date not null,
+  type         text default 'absent',       -- 'absent' | 'leave'
+  note         text,
+  created_at   timestamptz default now(),
+  unique (name, absence_date)
+);
+alter table ops_absences enable row level security;
+drop policy if exists "abs anon read"   on ops_absences;
+drop policy if exists "abs anon insert" on ops_absences;
+drop policy if exists "abs anon update" on ops_absences;
+drop policy if exists "abs anon delete" on ops_absences;
+create policy "abs anon read"   on ops_absences for select to anon, authenticated using (true);
+create policy "abs anon insert" on ops_absences for insert to anon, authenticated with check (true);
+create policy "abs anon update" on ops_absences for update to anon, authenticated using (true) with check (true);
+create policy "abs anon delete" on ops_absences for delete to anon, authenticated using (true);
+
+-- ----------------------------------------------------------------------------
 -- Shared task library — the selectable tasks (with icons) leaders pick from.
 -- New tasks added in the UI are archived here so everyone sees them next time.
 -- ----------------------------------------------------------------------------

@@ -58,7 +58,7 @@
       key: 'diamond', label: 'Diamond League', icon: '💎',
       outcome: 'Revenue & Sales',
       headers: ['diamond league', 'diamond'],
-      roles: ['core-ops', 'cash-ops', 'governance'],
+      roles: ['core-ops', 'cash-ops'],
       metrics: [
         { key: 'paid_clients', label: 'Paid Clients',  aliases: ['paid clients'] },
         { key: 'dl_amount',    label: 'Diamond League Collected ($)', money: true, aliases: ['diamond league collected', 'diamond league collections', 'diamond collected', 'diamond collections', 'dl collected', 'amount collected', 'value collected'] },
@@ -70,7 +70,7 @@
       key: 'sweep', label: 'Omnichannel', icon: '💬',
       outcome: 'Customer Contact',
       headers: ['omnichannel', 'clear & sweep', 'clear and sweep', 'clear &amp; sweep'],
-      roles: ['core-ops', 'cash-ops', 'governance'],
+      roles: ['core-ops', 'cash-ops'],
       metrics: [
         { key: 'cs_emails',       label: 'Emails Sent',      aliases: ['emails sent', 'emails'] },
         { key: 'cs_whatsapps',    label: 'WhatsApps Addressed', aliases: ['whatsapps addressed', 'whatsapps sent', 'whatsapps answered', 'whatsapp sent', 'whatsapps', 'whatsapp'] },
@@ -85,7 +85,7 @@
       key: 'tech', label: 'Technical Support & Escalations', icon: '🎫',
       outcome: 'Technical Resolution',
       headers: ['technical support & escalations', 'technical support and escalations', 'technical support'],
-      roles: ['core-ops', 'cash-ops', 'governance'],
+      roles: ['core-ops', 'cash-ops'],
       metrics: [
         { key: 'second_line',       label: '2nd-Line Tickets Worked', aliases: ['2nd line tickets worked on', 'tickets worked on 2nd line', '2nd line tickets', 'tickets worked on 2nd line', '2nd line'] },
         { key: 'tickets_resolved',  label: 'Tickets Resolved',  aliases: ['tickets resolved'] },
@@ -99,7 +99,7 @@
       key: 'billing', label: 'Billing Operations', icon: '💳',
       outcome: 'Billing & Cash',
       headers: ['billing operations', 'billing'],
-      roles: ['core-ops', 'cash-ops', 'governance'],
+      roles: ['core-ops', 'cash-ops'],
       metrics: [
         // The single "money collected throughout the day" figure for general
         // customers & sales — replaces the redundant Payments Captured / Proofs
@@ -116,7 +116,7 @@
       key: 'collections', label: 'Collections & Receivables', icon: '📉',
       outcome: 'Collections',
       headers: ['collections', 'collections & receivables'],
-      roles: ['core-ops', 'cash-ops', 'governance'],
+      roles: ['core-ops', 'cash-ops'],
       metrics: [
         { key: 'chidzoka',         label: 'Chidzoka Collections', aliases: ['chidzoka collections', 'chidzoka'] },
         { key: 'aged_receivables', label: 'Aged Receivables',     aliases: ['aged receivables'] },
@@ -127,7 +127,7 @@
       key: 'qa', label: 'Quality Assurance', icon: '✅',
       outcome: 'Quality & Compliance',
       headers: ['quality assurance', 'qa'],
-      roles: ['core-ops', 'cash-ops', 'network-ops', 'governance'],
+      roles: ['core-ops', 'cash-ops', 'network-ops'],
       metrics: [
         { key: 'qa_evaluations', label: 'QA Evaluations', aliases: ['quality assurance evaluations', 'qa evaluations'] },
         { key: 'credit_notes',   label: 'Credit Notes Reviewed', aliases: ['credit notes'] },
@@ -165,6 +165,23 @@
         { key: 'lan_tasks',            label: 'LAN / VoIP',            aliases: ['lan / voip', 'lan voip', 'lan tasks', 'lan', 'voip'] },
         { key: 'power_tasks',          label: 'Power, Automation & IoT', aliases: ['power, automation & iot', 'power automation iot', 'power tasks', 'power & automation', 'power and automation', 'automation iot'] }
       ]
+    },
+    {
+      // Dedicated reporting block for the Governance & Compliance team.
+      key: 'gov', label: 'Governance & Compliance', icon: '🛡️',
+      outcome: 'Quality, Compliance & Coaching',
+      headers: ['governance & compliance', 'governance and compliance', 'governance', 'compliance'],
+      roles: ['governance'],
+      metrics: [
+        { key: 'gov_qa',             label: 'QA Evaluations',                aliases: ['qa evaluations', 'quality assurance evaluations'] },
+        { key: 'gov_credit_notes',   label: 'Credit Notes',                  aliases: ['credit notes'] },
+        { key: 'gov_recon_regular',  label: 'Regular Reconciliations',       aliases: ['regular reconciliations', 'regular recons', 'reconciliations'] },
+        { key: 'gov_recon_churned',  label: 'Churned Reconciliations',       aliases: ['churned reconciliations', 'churn reconciliations', 'churned recons', 'churn recons'] },
+        { key: 'gov_billing_tickets',label: 'Billing Tickets',               aliases: ['billing tickets'] },
+        { key: 'gov_emails',         label: 'Emails',                        aliases: ['emails sent', 'emails'] },
+        { key: 'gov_whatsapp',       label: 'WhatsApp Conversations',        aliases: ['whatsapp conversations', 'whatsapps', 'whatsapp'] },
+        { key: 'gov_coaching',       label: 'Coaching & Calibration Sessions', aliases: ['coaching & calibration sessions', 'coaching and calibration', 'coaching sessions', 'calibration sessions', 'coaching'] }
+      ]
     }
   ];
 
@@ -174,7 +191,7 @@
      Each pillar metric: { label, keys:[...summed...], target } OR a ratio
      { label, ratioNum:[...], ratioDen:[...], target } (e.g. resolution rate).  */
   var SCORE_WEIGHTS = { throughput: 0.40, quality: 0.25, timeliness: 0.20, value: 0.15 };
-  var SHIFT_START = '08:30';   // arrival at/under this counts as punctual
+  var SHIFT_START = '08:00';   // arriving at/before this = on time for work (edit to your start time)
   var REPORT_DUE_HOUR = 21;    // 9:00 PM submission cut-off
 
   var ROLE_SCORECARD = {
@@ -227,13 +244,13 @@
     },
     'governance': {
       throughput: [
-        { label: 'QA evaluations + credit notes', keys: ['qa_evaluations', 'credit_notes'], target: 6 },
-        { label: 'Reconciliations reviewed',      keys: ['account_recons'], target: 5 },
-        { label: 'Follow-ups cleared',            keys: ['follow_ups'], target: 10 }
+        { label: 'Reconciliations (regular + churned)', keys: ['gov_recon_regular', 'gov_recon_churned'], target: 8 },
+        { label: 'Billing tickets',  keys: ['gov_billing_tickets'], target: 5 },
+        { label: 'Emails + WhatsApp', keys: ['gov_emails', 'gov_whatsapp'], target: 10 }
       ],
       quality: [
-        { label: 'Resolution rate', ratioNum: ['tickets_resolved'], ratioDen: ['tickets_resolved', 'tickets_escalated'], target: 0.60 },
-        { label: 'QA coverage',     keys: ['qa_evaluations', 'credit_notes'], target: 6 }
+        { label: 'QA evaluations + credit notes', keys: ['gov_qa', 'gov_credit_notes'], target: 6 },
+        { label: 'Coaching & calibration sessions', keys: ['gov_coaching'], target: 1 }
       ],
       // Governance is a compliance role — no revenue Value pillar; the score
       // re-weights across Throughput, Quality and Timeliness.
@@ -645,6 +662,40 @@
     return Promise.resolve({ ok: true });
   }
 
+  /* ---- ABSENCES / LEAVE -----------------------------------------------------
+     The admin can mark a leader absent or on leave for a date so they don't
+     show as "Missing". Stored in ops_absences (+ localStorage fallback).        */
+  var ABS_LS = 'afv_ops_absences';
+  function absLsAll() { try { return JSON.parse(localStorage.getItem(ABS_LS) || '[]'); } catch (e) { return []; } }
+  function absLsWrite(a) { localStorage.setItem(ABS_LS, JSON.stringify(a)); }
+  function loadAbsences() {
+    if (hasSupabase) {
+      return global._supabase.from('ops_absences').select('*').then(function (res) {
+        if (res.error || !res.data) return absLsAll();
+        var merged = res.data.slice();
+        absLsAll().forEach(function (l) { if (!merged.some(function (r) { return r.name === l.name && r.absence_date === l.absence_date; })) merged.push(l); });
+        return merged;
+      }).catch(function () { return absLsAll(); });
+    }
+    return Promise.resolve(absLsAll());
+  }
+  function setAbsence(name, date, type, note) {
+    var row = { name: name, absence_date: date, type: type || 'absent', note: note || null };
+    var all = absLsAll().filter(function (r) { return !(r.name === name && r.absence_date === date); });
+    all.push(row); absLsWrite(all);
+    if (hasSupabase) {
+      return global._supabase.from('ops_absences').upsert(row, { onConflict: 'name,absence_date' }).then(function () { return { ok: true }; }).catch(function () { return { ok: true, via: 'local' }; });
+    }
+    return Promise.resolve({ ok: true });
+  }
+  function clearAbsence(name, date) {
+    absLsWrite(absLsAll().filter(function (r) { return !(r.name === name && r.absence_date === date); }));
+    if (hasSupabase) {
+      return global._supabase.from('ops_absences').delete().eq('name', name).eq('absence_date', date).then(function () { return { ok: true }; }).catch(function () { return { ok: true }; });
+    }
+    return Promise.resolve({ ok: true });
+  }
+
   /* ---- 6. SEED -------------------------------------------------------------
      Demo data has been flushed — the system starts empty and only fills with
      real submissions. (Left intentionally blank.)                              */
@@ -804,6 +855,9 @@
     deleteReport: deleteReport,
     isLocked: isLocked,
     EDIT_WINDOW_HOURS: EDIT_WINDOW_HOURS,
+    loadAbsences: loadAbsences,
+    setAbsence: setAbsence,
+    clearAbsence: clearAbsence,
     seedIfEmpty: seedIfEmpty,
     reseed: reseed,
     DEFAULT_TASKS: DEFAULT_TASKS,

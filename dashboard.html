@@ -52,6 +52,10 @@
   .health-wrap { display:flex; gap:26px; align-items:center; flex-wrap:wrap; }
   .health-num { font-size:3.2rem; font-weight:800; letter-spacing:-2px; line-height:1; }
   .health-bars { flex:1; min-width:260px; }
+  .status-card.absent { background:#F1F5F9; border-color:var(--border-2); }
+  .lk-btn { font-size:.68rem; font-weight:700; padding:3px 8px; border-radius:999px; border:1px solid var(--border-2); background:#fff; color:var(--muted); cursor:pointer; white-space:nowrap; }
+  .lk-btn:hover { border-color:var(--blue); color:var(--blue); }
+  .card-actions { display:flex; flex-direction:column; gap:5px; align-items:flex-end; }
 </style>
 </head>
 <body>
@@ -192,6 +196,8 @@
 <script>
 const O = window.OpsData;
 let ALL = [];          // all reports
+let ABS = [];          // absences / leave
+const absenceFor = (name, date) => ABS.find(a => a.name===name && a.absence_date===date);
 const AVATAR_COLORS = ['#2563EB','#0D9488','#7C3AED','#DB2777','#D97706','#059669','#DC2626','#0891B2'];
 function avatarColor(name){ let h=0; for(const c of name) h=c.charCodeAt(0)+((h<<5)-h); return AVATAR_COLORS[Math.abs(h)%AVATAR_COLORS.length]; }
 function initials(n){ return (n||'?').trim().slice(0,2).toUpperCase(); }
@@ -232,6 +238,7 @@ async function boot(){
     O.backend === 'supabase' ? '● shared (Supabase)' : '● local demo mode';
   ALL = await O.loadReports();
   ALL.forEach(r => { r.metrics = r.metrics||{}; r.activities = r.activities||[]; });
+  ABS = await O.loadAbsences();
   // role filters
   const roleOpts = '<option value="">All roles</option>' +
     Object.keys(O.ROLES).map(k=>`<option value="${k}">${O.ROLES[k].label}</option>`).join('');
@@ -279,42 +286,74 @@ function renderTracker(){
   // "Missing" only applies once the 9:00 PM cut-off for that day has passed.
   // Before then, a not-yet-submitted leader is "Still to submit".
   const deadlinePassed = new Date() > new Date(date + 'T21:00:00');
-  let submitted=0, late=0, missing=0, pending=0;
+  let submitted=0, late=0, missing=0, pending=0, absent=0, arrWithTime=0, arrOnTime=0;
   const cards = roster.map(p => {
     const rep = onDate.find(r => r.name === p.name);
-    let badge, info, isMiss=false;
+    const abs = !rep && absenceFor(p.name, date);
+    let badge, info, isMiss=false, cls='', actions='';
     if (rep) {
       submitted++;
       const lateSub = submissionLate(rep);
       if (lateSub) late++;
       const st = subTimeStr(rep);
+      let arrTag = rep.arrival || '—';
+      if (rep.arrival) {
+        arrWithTime++;
+        const onTimeArr = rep.arrival <= O.SHIFT_START;
+        if (onTimeArr) arrOnTime++;
+        arrTag = `<span style="color:${onTimeArr?'var(--emerald)':'var(--amber)'};font-weight:700">${rep.arrival}${onTimeArr?'':' ⚠'}</span>`;
+      }
       badge = lateSub
         ? `<span class="badge badge--amber">Late${st?' · '+st:''}</span>`
         : `<span class="badge badge--green">On time${st?' · '+st:''}</span>`;
-      info = `🕘 Sent ${submittedLabel(rep)} · 🚶 In ${rep.arrival||'—'} · 🏁 Out ${rep.departure||'—'}`;
+      info = `🕘 Sent ${submittedLabel(rep)} · 🚶 In ${arrTag} · 🏁 Out ${rep.departure||'—'}`;
+    } else if (abs) {
+      absent++; cls='absent';
+      badge = abs.type==='leave'
+        ? `<span class="badge badge--blue">🏖 On leave</span>`
+        : `<span class="badge badge--gray">🚫 Absent</span>`;
+      info = (abs.note ? abs.note : (abs.type==='leave'?'On approved leave':'Marked absent')) + ' — not counted as missing';
+      actions = `<button class="lk-btn clr-abs" data-n="${p.name}">↩ Clear</button>`;
     } else if (deadlinePassed) {
       missing++; isMiss=true;
       badge = `<span class="badge badge--red">Missing</span>`;
       info = 'Not submitted by 9:00 PM';
+      actions = `<button class="lk-btn mark-abs" data-n="${p.name}">🚫 Absent</button><button class="lk-btn mark-leave" data-n="${p.name}">🏖 Leave</button>`;
     } else {
       pending++;
       badge = `<span class="badge badge--amber">Still to submit</span>`;
       info = 'Due by 9:00 PM';
+      actions = `<button class="lk-btn mark-abs" data-n="${p.name}">🚫 Absent</button><button class="lk-btn mark-leave" data-n="${p.name}">🏖 Leave</button>`;
     }
-    return `<div class="status-card ${isMiss?'miss':''}">
+    return `<div class="status-card ${isMiss?'miss':''} ${cls}">
       <span class="avatar" style="background:${avatarColor(p.name)}">${initials(p.fullName)}</span>
       <div class="meta"><div class="nm">${p.fullName}</div><div class="rl">${O.ROLES[p.role].label}</div><div class="rl" style="margin-top:2px;">${info}</div></div>
-      <span class="spacer"></span>${badge}</div>`;
+      <span class="spacer"></span>
+      <div class="card-actions">${badge}${actions}</div></div>`;
   }).join('');
   document.getElementById('trk-grid').innerHTML = cards;
-  document.getElementById('trk-sub').textContent = `${date} · reports due 9:00 PM` + (deadlinePassed?'':' · cut-off not yet reached');
+  // wire mark/clear absence buttons
+  const refreshAbs = async () => { ABS = await O.loadAbsences(); renderTracker(); };
+  document.querySelectorAll('#trk-grid .mark-abs').forEach(b => b.onclick = async () => { await O.setAbsence(b.dataset.n, date, 'absent'); await refreshAbs(); });
+  document.querySelectorAll('#trk-grid .mark-leave').forEach(b => b.onclick = async () => { await O.setAbsence(b.dataset.n, date, 'leave'); await refreshAbs(); });
+  document.querySelectorAll('#trk-grid .clr-abs').forEach(b => b.onclick = async () => { await O.clearAbsence(b.dataset.n, date); await refreshAbs(); });
+  document.getElementById('trk-sub').textContent = `${date} · reports due 9:00 PM · work starts ${O.SHIFT_START}`;
+  // time-keeping = blend of report-on-time and arrival-on-time
+  const subRate = submitted? (submitted-late)/submitted : null;
+  const arrRate = arrWithTime? arrOnTime/arrWithTime : null;
+  const tkParts = [subRate, arrRate].filter(x=>x!==null);
+  const timeKeeping = tkParts.length? Math.round(tkParts.reduce((a,b)=>a+b,0)/tkParts.length*100) : null;
+  const tkTone = timeKeeping===null?undefined:(timeKeeping>=80?'green':timeKeeping>=50?'amber':'red');
+  const arrTone = arrRate===null?undefined:(arrRate>=0.8?'green':arrRate>=0.5?'amber':'red');
+  const expected = roster.length - absent;   // absentees aren't expected to report
   document.getElementById('trk-kpis').innerHTML = `
-    ${kpi('Submitted', submitted+'/'+roster.length, 'on this date')}
+    ${kpi('Submitted', submitted+'/'+expected, absent? absent+' absent/on leave':'on this date')}
     ${deadlinePassed
         ? kpi('Missing', missing, missing? 'no report by 9 PM':'all in ✓', missing?'red':'green')
         : kpi('Still to submit', pending, 'due by 9:00 PM', pending?'amber':'green')}
-    ${kpi('Late (after 9pm)', late, 'submitted past 21:00', late?'amber':'green')}
-    ${kpi('On-time rate', submitted? Math.round((submitted-late)/submitted*100)+'%':'—','of those submitted')}`;
+    ${kpi('🕘 Reports on time', submitted? Math.round((submitted-late)/submitted*100)+'%':'—', late+' late · by 9 PM', late?'amber':'green')}
+    ${kpi('🚶 Arrivals on time', arrWithTime? arrOnTime+'/'+arrWithTime : '—', 'by '+O.SHIFT_START, arrTone)}
+    ${kpi('⏱️ Time-keeping', timeKeeping===null?'—':timeKeeping+'%', 'arrival + report punctuality', tkTone)}`;
 
   // last 14 days streak grid
   const days = []; for (let i=13;i>=0;i--) days.push(addDays(date,-i));
@@ -323,10 +362,12 @@ function renderTracker(){
       const dow = new Date(d+'T00:00:00').getDay();
       const weekend = dow===0||dow===6;
       const has = ALL.some(r=>r.name===p.name && r.report_date===d);
-      // a day is only "missed" once its own 9 PM cut-off has passed
+      const abs = absenceFor(p.name, d);
+      // a day is only "missed" once its own 9 PM cut-off has passed (and not absent)
       const cutoffPassed = new Date() > new Date(d+'T21:00:00');
-      let cls = has ? 'ok' : (weekend || !cutoffPassed ? 'future' : 'miss');
-      return `<span class="dot ${cls}" title="${d}${has?' ✓':!cutoffPassed?' · still to submit':' · missed'}"></span>`;
+      let cls = has ? 'ok' : (weekend || abs || !cutoffPassed ? 'future' : 'miss');
+      const tip = has?' ✓':abs?(' · '+(abs.type==='leave'?'on leave':'absent')):(!cutoffPassed?' · still to submit':' · missed');
+      return `<span class="dot ${cls}" title="${d}${tip}"></span>`;
     }).join('');
     return `<div class="row mb" style="gap:14px;">
       <div style="width:150px; font-weight:600; font-size:.85rem;">${p.fullName}</div>
@@ -568,14 +609,19 @@ function renderHistory(){
   const scored = rows.map(perScore).filter(s=>s!==null);
   const avgScore = scored.length? Math.round(scored.reduce((a,b)=>a+b,0)/scored.length) : null;
   const lateN = rows.filter(submissionLate).length;
-  const onTime = rows.length? Math.round((rows.length-lateN)/rows.length*100):0;
+  // time-keeping: blend of report-on-time and arrival-on-time
+  const subRate = rows.length? (rows.length-lateN)/rows.length : null;
+  const arrRows = rows.filter(r=>r.arrival);
+  const arrRate = arrRows.length? arrRows.filter(r=>r.arrival<=O.SHIFT_START).length/arrRows.length : null;
+  const tkParts = [subRate, arrRate].filter(x=>x!==null);
+  const timeKeeping = tkParts.length? Math.round(tkParts.reduce((a,b)=>a+b,0)/tkParts.length*100) : null;
   const kpi4 = isScore
     ? kpi('Best report', scored.length? Math.max(...scored):'—', 'highest single day')
     : kpi(metricLabel, rows.reduce((s,r)=>s+val(r),0), 'total · across all reports');
   document.getElementById('hist-kpis').innerHTML = `
     ${kpi('Reports', rows.length, 'all time')}
     ${kpi('Productivity score', avgScore===null?'—':avgScore, scored.length? 'avg score':'no metrics yet', avgScore===null?undefined:(avgScore>=75?'green':avgScore>=50?'amber':'red'))}
-    ${kpi('On-time rate', rows.length? onTime+'%':'—', lateN+' late (after 9pm)', lateN?'amber':'green')}
+    ${kpi('⏱️ Time-keeping', timeKeeping===null?'—':timeKeeping+'%', (subRate===null?'—':Math.round(subRate*100)+'% reports')+' · '+(arrRate===null?'—':Math.round(arrRate*100)+'% arrivals'), timeKeeping===null?undefined:(timeKeeping>=80?'green':timeKeeping>=50?'amber':'red'))}
     ${kpi4}`;
 
   // trend sparkline (defaults to score over time)
