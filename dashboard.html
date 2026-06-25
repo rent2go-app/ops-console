@@ -93,8 +93,6 @@
       <button class="btn btn--ghost btn--sm" id="trk-today">Today</button>
       <button class="btn btn--ghost btn--sm" id="trk-latest">Latest day with reports</button>
       <select id="trk-role" class="select"><option value="">All roles</option></select>
-      <span class="spacer"></span>
-      <button class="btn btn--ghost btn--sm" id="trk-reseed" title="Re-load the original sample reports">↻ Reload sample data</button>
     </div>
     <div class="stat-grid mb" id="trk-kpis"></div>
     <div class="card mb">
@@ -230,7 +228,6 @@ function submittedLabel(r){
 }
 
 async function boot(){
-  O.seedIfEmpty();
   document.getElementById('backend-tag').textContent =
     O.backend === 'supabase' ? '● shared (Supabase)' : '● local demo mode';
   ALL = await O.loadReports();
@@ -272,14 +269,6 @@ document.getElementById('trk-date').onchange = renderTracker;
 document.getElementById('trk-role').onchange = renderTracker;
 document.getElementById('trk-today').onclick = () => { document.getElementById('trk-date').value = todayISO(); renderTracker(); };
 document.getElementById('trk-latest').onclick = () => { document.getElementById('trk-date').value = latestReportDate() || todayISO(); renderTracker(); };
-document.getElementById('trk-reseed').onclick = async () => {
-  if (!confirm('Reload the original 8 sample reports? This restores them on their real dates (Almah, Tafadzwa, Abigail, Abitania → 24 Jun; others on their own dates).')) return;
-  O.reseed();
-  ALL = await O.loadReports();
-  ALL.forEach(r => { r.metrics = r.metrics||{}; r.activities = r.activities||[]; });
-  document.getElementById('trk-date').value = latestReportDate() || todayISO();
-  renderTracker(); renderProductivity(); renderHistory();
-};
 
 function renderTracker(){
   const date = document.getElementById('trk-date').value || todayISO();
@@ -390,7 +379,7 @@ function renderProductivity(){
     ${kpi('💎 Diamond League', fmtMoney(sumMetric(rows,'dl_amount')), 'collected · running total', 'green')}
     ${kpi('🛒 Gen Pop & Sales', fmtMoney(sumMetric(rows,'gp_amount')), 'collected · running total', 'green')}
     ${kpi('Tickets resolved', sumMetric(rows,'tickets_resolved'), 'team total')}
-    ${kpi('Payments captured', sumMetric(rows,'payments_captured'), 'team total')}
+    ${kpi('Reconciliations', sumMetric(rows,'account_recons'), 'team total')}
     ${kpi('Calls handled', callsOf(rows), 'inbound + outbound')}`;
 
   // ---- DAILY team outputs ----
@@ -402,7 +391,7 @@ function renderProductivity(){
     {lab:'Paid',       f:rr=>sumMetric(rr,'paid_clients')},
     {lab:'Tkts resolved', f:rr=>sumMetric(rr,'tickets_resolved')},
     {lab:'Tkts closed',   f:rr=>sumMetric(rr,'tickets_closed')},
-    {lab:'Payments',   f:rr=>sumMetric(rr,'payments_captured')},
+    {lab:'Walk-ins',   f:rr=>sumMetric(rr,'walkins')},
     {lab:'Calls',      f:rr=>callsOf(rr)},
     {lab:'QA',         f:rr=>qaOf(rr)},
     {lab:'Recons',     f:rr=>reconsOf(rr)},

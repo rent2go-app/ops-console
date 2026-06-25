@@ -37,9 +37,12 @@ drop policy if exists "ops anon read"   on ops_reports;
 drop policy if exists "ops anon write"  on ops_reports;
 drop policy if exists "ops anon update" on ops_reports;
 
+drop policy if exists "ops anon delete" on ops_reports;
+
 create policy "ops anon read"   on ops_reports for select to anon, authenticated using (true);
 create policy "ops anon write"  on ops_reports for insert to anon, authenticated with check (true);
 create policy "ops anon update" on ops_reports for update to anon, authenticated using (true) with check (true);
+create policy "ops anon delete" on ops_reports for delete to anon, authenticated using (true);
 
 -- ----------------------------------------------------------------------------
 -- Shared task library — the selectable tasks (with icons) leaders pick from.

@@ -101,9 +101,10 @@
       headers: ['billing operations', 'billing'],
       roles: ['core-ops', 'cash-ops', 'governance'],
       metrics: [
-        { key: 'gp_amount',          label: 'Gen Pop & Sales Collected ($)', money: true, aliases: ['gen pop & sales collected', 'gen pop and sales', 'gen pop collected', 'gen pop collections', 'genpop collected', 'general collections', 'sales collected', 'gen pop'] },
-        { key: 'payments_captured',  label: 'Payments Captured',  aliases: ['payments captured'] },
-        { key: 'payments_confirmed', label: 'Payments Confirmed (Bank)', aliases: ['payments confirmed on bank statement', 'payments confirmed'] },
+        // The single "money collected throughout the day" figure for general
+        // customers & sales — replaces the redundant Payments Captured / Proofs
+        // of Payment counts. Distinct from Diamond League collections.
+        { key: 'gp_amount',          label: 'Gen Pop & Sales Collected ($)', money: true, aliases: ['gen pop & sales collected', 'gen pop and sales', 'gen pop collected', 'gen pop collections', 'genpop collected', 'money collected', 'collected today', 'total collected', 'payments captured', 'payments confirmed', 'proofs of payment', 'general collections', 'sales collected', 'gen pop'] },
         { key: 'account_recons',     label: 'Account Reconciliations', aliases: ['account reconciliations', 'accountreconciliations', 'june account reconciliations', 'churn recons', 'reconciliations'] },
         { key: 'bank_approvals',     label: 'Bank Approvals',     aliases: ['bank approvals'] },
         { key: 'cash_disbursed',     label: 'Cash Payments Disbursed', aliases: ['cash payments disbursed', 'cash payments', 'cash disbursed'] },
@@ -181,8 +182,7 @@
       throughput: [
         { label: 'Tickets resolved',        keys: ['tickets_resolved'], target: 5 },
         { label: 'Tickets closed + updated', keys: ['tickets_closed', 'tickets_updated'], target: 12 },
-        { label: 'Calls handled',           keys: ['inbound_calls', 'outbound_calls', 'dl_calls'], target: 12 },
-        { label: 'Payments captured',       keys: ['payments_captured'], target: 3 }
+        { label: 'Calls handled',           keys: ['inbound_calls', 'outbound_calls', 'dl_calls'], target: 12 }
       ],
       quality: [
         { label: 'QA done',          keys: ['qa_evaluations', 'credit_notes'], target: 5 },
@@ -197,10 +197,9 @@
     },
     'cash-ops': {
       throughput: [
-        { label: 'Walk-ins attended',          keys: ['walkins'], target: 6 },
-        { label: 'Payments captured + confirmed', keys: ['payments_captured', 'payments_confirmed'], target: 6 },
-        { label: 'Bank approvals',             keys: ['bank_approvals'], target: 5 },
-        { label: 'Calls + WhatsApps',          keys: ['inbound_calls', 'outbound_calls', 'cs_whatsapps'], target: 10 }
+        { label: 'Walk-ins attended', keys: ['walkins'], target: 6 },
+        { label: 'Bank approvals',    keys: ['bank_approvals'], target: 5 },
+        { label: 'Calls + WhatsApps', keys: ['inbound_calls', 'outbound_calls', 'cs_whatsapps'], target: 10 }
       ],
       quality: [
         { label: 'Reconciliations',     keys: ['account_recons'], target: 15 },
@@ -552,6 +551,15 @@
   var LS_KEY = 'afv_ops_reports';
   var hasSupabase = (typeof global._supabase !== 'undefined' && global._supabase);
 
+  // One-time flush of the old demo data from any browser that still holds it.
+  // Runs once per browser; real submissions made after this are untouched.
+  try {
+    if (localStorage.getItem('afv_ops_demo_flushed_v1') !== '1') {
+      localStorage.removeItem(LS_KEY);
+      localStorage.setItem('afv_ops_demo_flushed_v1', '1');
+    }
+  } catch (e) {}
+
   function lsAll() {
     try { return JSON.parse(localStorage.getItem(LS_KEY) || '[]'); } catch (e) { return []; }
   }
@@ -638,22 +646,9 @@
   }
 
   /* ---- 6. SEED -------------------------------------------------------------
-     The pasted sample reports, so the dashboard isn't empty on first open.
-     Only seeds localStorage if it's empty. Never touches Supabase.            */
-  var SEED = [
-    "📋 Almah End of Day Report\n🤝 Attended the SD Morning Huddle.\n🤝 Attended the DOS Morning Huddle.\n✅ Approved requisitions.\n📦 Completed packing expense approvals.\n👥 Held a short meeting with Team Rukweza and David regarding productivity issues.\n🤝 Assisted Sandra Schewalts walkin client\n🎫 Followed up on outstanding tickets.\n🏢 Approved facilities work completed the previous day.\n🚗 Approved fleet requests for all vehicles.\n📝 Prepared, printed, and distributed damage forms to the team.\n📊 Validated civil works timesheets for the previous week and shared them with the team.\n🎟️ Worked on Helpdesk tickets and closed resolved tickets.\n🛠️ Assisted technicians with remote troubleshooting activities.\n📡 Supported Wesley with installation-related issues.\n👥 Held a short meeting with Chaka regarding Mushe hotspots.\n📈 Compiled and reviewed area fault reports.\n⏭️ Carried forward pending tasks for action on the next working day.\n📋 Conducted follow-ups and updated the end-of-day reporting tracker.\n📅 Date: 24/06/2026",
-    "CORE OPS LEADER END-OF-SHIFT REPORT\nTafadzwa\n📅 Date:24/06/2026\n🕒 Shift: Day\n⏰ Time of Arrival: 07:03\n💎 DIAMOND LEAGUE\n• Paid Clients: 2\n• Emails Sent: \n• Calls Made: 4\n🧹 CLEAR & SWEEP\n• Emails Sent: 1\n• WhatsApps Sent:\n• Tickets Updated:7\n• Inbound Calls: 6\n• Outbound calls:6\n• Tickets closed: 4\n• Tickets Created: 2\n🎫 TECHNICAL SUPPORT & ESCALATIONS\n• 2nd Line Tickets Worked On: 7\n• Tickets Resolved: 4\nTasks Created : 2\n• Tickets Escalated: 4\nRecons : 13",
-    "CASH OPS LEADER END-OF-SHIFT REPORT\nAbigail\n📅 Date: 24/06/2026\n🕒 Shift: Day\n⏰ Time of Arrival: 08:00\n💳 BILLING OPERATIONS\n🚶🏽‍♀️ Walkin Customers Attended 6\n Churn Recons 20 done\n Incoming calls 5 attended\n Emails Sent: 2\n• Whatsapps Answered: 4\n• Tickets : 20 updated\n5 internal customers attended to\n🎟️ Cash payments disbursed 4 done\n💎 DIAMOND LEAGUE\n• Paid Clients: none\n• Emails Sent: 2 sent\n• Contacts Made: 4\n💰 Bank Approvals - 7 done",
-    "Abitania\nNETWORK OPS DAY SHIFT REPORT\nDate: 24/06/2026\nTime of Arrival: 0800hrs\nActivities Completed:\n• Conducted the morning huddle with the Network Operations team, discussing scheduled tasks, pending issues requiring escalation, and reviewing close-gap measures implemented for all area faults from 15 June 2026 to date.\n• Participated in the morning huddle with the Customer Success Team, Core Operations, Network Operations, and Cash Office teams.\n• Reviewed tasks assigned on the previous day and monitored updates in the Facilities Pro system.\n• Performed Quality Assurance (QA) on tasks completed by Stewart, Waso, Nyamhunga, and Itai in Facilities Pro.\n• Remotely troubleshot Sandra Schwartz's link and subsequently visited the client site to resolve the connectivity issue and relocate equipment as requested by the client.\n• Followed up on all scheduled tasks assigned to the Power, Network, and Civil teams.\n• Updated the Network Operations End-of-Day (EOD) report.\n• Conducted QA on works completed by Lawrence and Upwell and validated their timesheets.\n• Assigned fleet requests and ensured all requests were allocated appropriately.\n• Followed up with Mr. Maseya and John regarding the Ruwa BTS Solar System Upgrade.\n• Followed up with Tanaka Kahwai regarding the error in the Recruitment Module.\n• Followed up on the payment for 7mm stones to enable the resumption of manhole manufacturing.\n• Conducted Quality Assurance on installations and maintenance tasks completed on the previous day.\n• Compiled and reported on close-gap measures implemented for cable uproots and POP outages.\n• Validated and conducted QA on overtime timesheets for the Service Maintenance and Delivery teams.\nEnd of Report.",
-    "CORE OPS TEAM LEADER REPORT\nChirwa | 19/06/2026 | 0759\nCOMMUNICATIONS & SUPPORT\n• No customer-facing communications or ticket administration activities completed.\nOPERATIONS\n• Completed 5 quality assurance evaluations across 2 billing tickets.\n• Reviewed 2 account reconciliations and identified a net loss position of $45 across the same two accounts.\n• Completed quality assurance reviews of 7 credit notes.\n• Conducted 27 follow-ups to clear overdue tasks and issue process reminders to agents.\nCOLLABORATION & STAKEHOLDER ENGAGEMENT\n• No collaboration or stakeholder engagement activities completed.",
-    "CORE OPS LEADER END-OF-SHIFT REPORT\nVanessa\n📅 Date:19/06/2026\n🕒 Shift: Day\n⏰ Time of Arrival: 07:49\n💎 DIAMOND LEAGUE\n• Paid Clients: 1\n• Emails Sent: 2\n• Calls Made: 5\n🧹 CLEAR & SWEEP\n• Emails Sent: \n• WhatsApps Sent:2\n• Tickets Updated:2\n• Inbound Calls: 3\n• Outbound calls:6\n• Tickets closed: \n• Tickets Created: \n🎫 TECHNICAL SUPPORT & ESCALATIONS\n• 2nd Line Tickets Worked On: \n• Tickets Resolved: \nTasks Created : \n• Tickets Escalated: \n💳 BILLING OPERATIONS\n• Payments Captured : 3\n• Payments Confirmed on Bank Statement:\nPayment Plan meeting attended\nOdoo Automation Training\nExco Customer Success Meeting\nBilling tickets QA\nEmails QA",
-    "CORE OPS LEADER END-OF-SHIFT REPORT\nLungile\n📅 Date: 16/06/2026\n🕒 Shift: Day\n⏰ Time of Arrival: 08:00\n💎 DIAMOND LEAGUE\n• Paid Clients: 0\n• Emails Sent: 3\n• Calls Made: 4\n🧹 CLEAR & SWEEP\n• Emails sent: 4\n• WhatsApp sent: 2\n• Tickets Updated:13\n• Inbound Calls: 0\n• Outbound calls:5\n🎫 TECHNICAL SUPPORT & ESCALATIONS\n• 2nd Line Tickets Worked On: 5\nTickets Created : 0\nTasks Closed : 2\nTickets Escalated: 10\n• Chidzoka collections: 0\n💳 BILLING OPERATIONS\n• Payments Captured :2\n• June Account reconciliations:2",
-    "CORE OPS LEADER END-OF-SHIFT REPORT\nRorisang\n📅 Date: 12/06/2026\n🕒 Shift: Day\n⏰ Time of Arrival: 07:58\n💎 DIAMOND LEAGUE\n• Paid Clients: 0\n• Emails Sent: 0\n• Calls Made: 7\n🧹 CLEAR & SWEEP\n• Emails Sent:0\n• WhatsApps Answered: 0\n• Tickets Updated: 11\n• Inbound Calls: 0\n• Outbound calls: 10\n• Tickets closed:6\n🎫 TECHNICAL SUPPORT & ESCALATIONS\n• 2nd Line Tickets Worked On: 7\n• Tickets Resolved: 5\nTasks Created : 2\n• Tickets Escalated: 7\n• Chidzoka collections: 0\n• Aged Receivables: 6\n• Disconnections:15\nPayment plan meeting Attended twice",
-    // ---- 24 June 2026 batch (added later) ----
-    "End-of-Day Report – 24 June 2026 ( rorisang )\nPayments: EcoCash payments almost up to date, with only three payments still pending capture from today's scheduled items. Stanbic payments had an influx that could not be fully completed on day shift and will be handed to night shift.\nFaults: Yesterday's faults (Vainona, Marlbereign, Westgate) are running on alternative solutions. No active faults recorded today.\nHelpdesk: In a better position than yesterday. No major pending tickets; Bronze, Silver, Gold, Platinum and Network Outage tickets reviewed and moved between first and second line where required.\nBilling Tickets: Remain the main pressure point; team is slowly working through the queue.\nReviewed suspensions, terminations, upgrades and downgrades queue; two upgrade cases remain pending.\nWhatsApp: Rose reduced unanswered messages significantly; only a few new messages remain pending.\nEmails: Only about two to four emails pending; NOC report inbox clear. Completing the Core Ops daily sweeps.\nChidzoka Campaign started stronger today, with 61 clients assigned for follow-up, prioritising warm leads first.\nInbound Calls: 14 inbound calls answered today. Seven abandoned or missed calls still need follow-up.\nWins: Good number of new leads, especially the $79 package, geysers and solar; ticketed and escalated to Sales.\nNight Shift Handover: Continue capturing outstanding Standard payments, follow up the seven abandoned calls, and continue billing tickets.\nBlocker: Chidzoka Campaign progress slower than expected; will align with Sales (Mr Noko & Belinda M) to improve conversion.",
-    "CORE OPS TEAM LEADER REPORT\nChirwa | 24/06/2026 | 07:59\nCOMMUNICATIONS & SUPPORT\n• Sent emails and WhatsApp messages to agents to communicate QA feedback and initiate remedial actions following reviews.\n• Created a support ticket for Simbarashe Duve.\nOPERATIONS\n• Completed 13 additional reconciliation reviews for John (5) and Tanatswa (8), adding to prior reviews already conducted.\n• Conducted 3 internal follow-ups related to operational and QA actions.\nCOLLABORATION & STAKEHOLDER ENGAGEMENT\n• No formal meetings or stakeholder sessions conducted.",
-    "CORE OPS LEADER END-OF-SHIFT REPORT\nLungile\n📅 Date: 24/06/2026\n🕒 Shift: Day\n⏰ Time of Arrival: 07:53\n💎 DIAMOND LEAGUE\n• Paid Clients: 0\n• Emails Sent: \n• Calls Made: 3\n🧹 CLEAR & SWEEP\n• Emails sent: 5\n• WhatsApp sent: 1\n• Tickets Updated:4\n• Inbound Calls: 0\n• Outbound calls:5\n🎫 TECHNICAL SUPPORT & ESCALATIONS\n• 2nd Line Tickets Worked On: 2\nTasks Created : 0\nTickets Escalated: 1\n💳 BILLING OPERATIONS\n• Payments Captured :3\n• June account reconciliations:17"
-  ];
+     Demo data has been flushed — the system starts empty and only fills with
+     real submissions. (Left intentionally blank.)                              */
+  var SEED = [];
 
   function seedRows() {
     return SEED.map(function (raw) {
