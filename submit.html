@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Submit Report — Ops Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="ops.css" />
+<style>
+  .picker { border:1.5px dashed var(--border-2); border-radius:12px; padding:14px; background:var(--bg); }
+  .picker__search { display:flex; gap:8px; align-items:center; margin-bottom:10px; }
+  .task-groups { max-height:260px; overflow:auto; padding-right:4px; }
+  .task-group__lab { font-size:.72rem; font-weight:800; text-transform:uppercase; letter-spacing:.6px; color:var(--muted); margin:10px 0 6px; }
+  .task-chips { display:flex; flex-wrap:wrap; gap:7px; }
+  .task-chip { display:inline-flex; align-items:center; gap:6px; font-size:.82rem; font-weight:600; padding:6px 11px; border-radius:999px; border:1px solid var(--border-2); background:#fff; cursor:pointer; transition:.12s; }
+  .task-chip:hover { border-color:var(--blue); color:var(--blue); background:var(--blue-soft); }
+  .task-chip.added { background:var(--emerald-soft); border-color:#A7F3D0; color:var(--emerald); }
+  .task-chip .x { opacity:.6; }
+  .task-chip.added::after { content:'✓'; font-weight:800; }
+  .newtask { margin-top:12px; border-top:1px solid var(--border); padding-top:12px; }
+  .newtask .row { gap:8px; flex-wrap:wrap; }
+  .newtask input { flex:1; min-width:180px; }
+  .badge-archived { font-size:.66rem; background:var(--amber-soft); color:var(--amber); padding:1px 7px; border-radius:999px; font-weight:700; margin-left:4px; }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar__inner">
+    <a class="brand" href="index.html">
+      <span class="brand__mark">📡</span>
+      <span>Ops Console<small>Daily Reporting</small></span>
+    </a>
+    <nav class="topnav">
+      <a href="submit.html" class="active">Submit Report</a>
+      <a href="dashboard.html">Dashboard</a>
+    </nav>
+  </div>
+</header>
+
+<div class="wrap wrap--narrow">
+
+  <!-- STEP 1 — paste -->
+  <div id="step-paste">
+    <div class="page-head">
+      <div class="eyebrow">End-of-shift report</div>
+      <h1>Submit your daily report</h1>
+      <p>Pick your name, paste your report exactly as you'd send it on WhatsApp, then review the captured numbers before submitting.</p>
+    </div>
+
+    <div class="card"><div class="card__body">
+      <div class="grid-2">
+        <div class="field">
+          <label for="who">Who is reporting?</label>
+          <select id="who" class="select"></select>
+        </div>
+        <div class="field">
+          <label for="role-pick">Role <span class="hint">(sets which metrics show)</span></label>
+          <select id="role-pick" class="select"></select>
+        </div>
+      </div>
+      <div class="field" style="margin-bottom:10px;">
+        <label for="paste">Paste your report <span class="hint">— or skip this and build it from the task list on the next step</span></label>
+        <textarea id="paste" class="input" rows="11" placeholder="📋 End of Day Report&#10;💎 DIAMOND LEAGUE&#10;• Paid Clients: 2&#10;• Calls Made: 4&#10;..."></textarea>
+      </div>
+      <div class="row row--wrap">
+        <button class="btn btn--primary btn--lg" id="parse-btn">Review captured report →</button>
+        <button class="btn btn--dark btn--lg" id="manual-btn" type="button">Build from task list →</button>
+        <button class="btn btn--ghost" id="sample-btn" type="button">Load a sample</button>
+        <span class="spacer"></span>
+        <span class="muted" id="backend-tag" style="font-size:.78rem;"></span>
+      </div>
+    </div></div>
+    <p class="footer-note">Paste to auto-capture numbers, or build from the task list — either way you confirm everything before it's saved.</p>
+  </div>
+
+  <!-- STEP 2 — review -->
+  <div id="step-review" class="hidden">
+    <div class="page-head">
+      <div class="eyebrow">Step 2 of 2 · Review &amp; confirm</div>
+      <h1>Check the captured report</h1>
+      <p>We pulled these out of your paste. Fix anything that's off, then submit. Blank metrics are simply ignored.</p>
+    </div>
+
+    <div class="card mb"><div class="card__body">
+      <div class="grid-2">
+        <div class="field"><label>Name</label><select id="r-name" class="select"></select></div>
+        <div class="field"><label>Role</label><select id="r-role" class="select"></select></div>
+      </div>
+      <div class="grid-2">
+        <div class="field"><label>Report date</label><input type="date" id="r-date" class="input" /></div>
+        <div class="field"><label>Shift</label>
+          <select id="r-shift" class="select"><option>Day</option><option>Night</option></select>
+        </div>
+      </div>
+      <div class="field" style="max-width:50%"><label>Time of arrival <span class="hint">(punctuality)</span></label><input type="time" id="r-arrival" class="input" /></div>
+    </div></div>
+
+    <div id="metric-cards"></div>
+
+    <div class="card mb">
+      <div class="card__head"><h2>➕ Add tasks from the list</h2><span class="sub">tap to add · tap again to remove</span></div>
+      <div class="card__body">
+        <div class="picker">
+          <div class="picker__search">
+            <input id="task-search" class="input" placeholder="🔍 Search tasks…" />
+          </div>
+          <div class="task-groups" id="task-groups"></div>
+          <div class="newtask">
+            <div style="font-size:.8rem; font-weight:700; margin-bottom:7px;">Can't find it? Add a new task — it's archived for everyone next time.</div>
+            <div class="row">
+              <input id="nt-label" class="input" placeholder="New task description…" />
+              <select id="nt-theme" class="select" style="width:200px; flex:0 0 200px;"></select>
+              <button class="btn btn--dark btn--sm" id="nt-add" type="button">Add &amp; archive</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card mb">
+      <div class="card__head"><h2>🗒️ Activities &amp; tasks on this report</h2><span class="sub" id="act-count"></span></div>
+      <div class="card__body">
+        <p class="muted" style="font-size:.84rem; margin-bottom:12px;">Each line is tagged to an outcome theme for the dashboard. Adjust the tag or text, or remove lines.</p>
+        <div id="act-list"></div>
+        <button class="btn btn--ghost btn--sm mt" id="add-act" type="button">+ Add a blank line</button>
+      </div>
+    </div>
+
+    <div class="row mt">
+      <button class="btn btn--ghost" id="back-btn" type="button">← Back to paste</button>
+      <span class="spacer"></span>
+      <button class="btn btn--primary btn--lg" id="submit-btn">Submit report ✓</button>
+    </div>
+  </div>
+
+  <!-- DONE -->
+  <div id="step-done" class="hidden">
+    <div class="card mt-lg"><div class="card__body center" style="padding:46px 24px;">
+      <div style="font-size:3rem;">✅</div>
+      <h1 style="font-size:1.4rem; margin:10px 0 4px;">Report submitted</h1>
+      <p class="muted" id="done-msg"></p>
+      <div class="row" style="justify-content:center; margin-top:22px;">
+        <button class="btn btn--primary" id="another-btn" type="button">Submit another</button>
+        <a class="btn btn--ghost" href="dashboard.html">Go to dashboard →</a>
+      </div>
+    </div></div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.108.2"></script>
+<script src="ops-config.js"></script>
+<script src="ops-data.js"></script>
+<script>
+const O = window.OpsData;
+let draft = null; // working report being reviewed
+
+// ---- init pickers ----
+function fillRoster(sel, selectedName) {
+  sel.innerHTML = '<option value="">— select —</option>' +
+    O.ROSTER.map(p => `<option value="${p.name}" ${p.name===selectedName?'selected':''}>${p.name} · ${O.ROLES[p.role].label}</option>`).join('');
+}
+function fillRoles(sel, selectedRole) {
+  sel.innerHTML = Object.keys(O.ROLES).map(k =>
+    `<option value="${k}" ${k===selectedRole?'selected':''}>${O.ROLES[k].icon} ${O.ROLES[k].label}</option>`).join('');
+}
+fillRoster(document.getElementById('who'));
+fillRoles(document.getElementById('role-pick'), 'core-ops');
+fillRoster(document.getElementById('r-name'));
+fillRoles(document.getElementById('r-role'));
+document.getElementById('backend-tag').textContent =
+  O.backend === 'supabase' ? '● shared (Supabase)' : '● local demo mode';
+
+// keep role-pick synced when a name is chosen
+document.getElementById('who').addEventListener('change', e => {
+  const p = O.ROSTER.find(x => x.name === e.target.value);
+  if (p) document.getElementById('role-pick').value = p.role;
+});
+
+// ---- sample loader ----
+const SAMPLE = `CORE OPS LEADER END-OF-SHIFT REPORT
+Tafadzwa
+📅 Date: ${new Date().toISOString().slice(0,10).split('-').reverse().join('/')}
+🕒 Shift: Day
+⏰ Time of Arrival: 07:03
+💎 DIAMOND LEAGUE
+• Paid Clients: 2
+• Calls Made: 4
+🧹 CLEAR & SWEEP
+• Emails Sent: 1
+• Tickets Updated: 7
+• Inbound Calls: 6
+• Outbound calls: 6
+• Tickets closed: 4
+🎫 TECHNICAL SUPPORT & ESCALATIONS
+• 2nd Line Tickets Worked On: 7
+• Tickets Resolved: 4
+• Tickets Escalated: 4
+Held a short huddle with the team on outstanding tickets.`;
+document.getElementById('sample-btn').onclick = () => {
+  document.getElementById('paste').value = SAMPLE;
+  document.getElementById('who').value = 'Tafadzwa';
+  document.getElementById('role-pick').value = 'core-ops';
+};
+
+// ---- parse ----
+document.getElementById('parse-btn').onclick = () => {
+  const raw = document.getElementById('paste').value.trim();
+  if (!raw) { toast('Paste your report first', true); return; }
+  draft = O.parseReport(raw);
+  // overlay the manual picks if the user set them
+  const pickedName = document.getElementById('who').value;
+  const pickedRole = document.getElementById('role-pick').value;
+  if (pickedName) draft.name = pickedName;
+  if (!draft.role) draft.role = pickedRole;
+  if (pickedName && O.ROSTER.find(p=>p.name===pickedName)) draft.role = O.ROSTER.find(p=>p.name===pickedName).role;
+  if (!draft.date) draft.date = new Date().toISOString().slice(0,10);
+  renderReview();
+  show('review');
+};
+
+// ---- build manually (no paste) ----
+document.getElementById('manual-btn').onclick = () => {
+  const pickedName = document.getElementById('who').value;
+  const pickedRole = document.getElementById('role-pick').value;
+  const rosterRole = pickedName && O.ROSTER.find(p=>p.name===pickedName);
+  draft = {
+    name: pickedName || '',
+    role: rosterRole ? rosterRole.role : pickedRole,
+    date: new Date().toISOString().slice(0,10),
+    shift: 'Day', arrival: null, metrics: {}, activities: [], raw: ''
+  };
+  renderReview();
+  show('review');
+};
+
+// ---- review render ----
+function renderReview() {
+  fillRoster(document.getElementById('r-name'), draft.name);
+  fillRoles(document.getElementById('r-role'), draft.role);
+  document.getElementById('r-date').value = draft.date || '';
+  document.getElementById('r-shift').value = draft.shift || 'Day';
+  document.getElementById('r-arrival').value = draft.arrival || '';
+  renderMetricCards();
+  renderActivities();
+  renderTaskPicker();
+}
+
+function renderMetricCards() {
+  const role = document.getElementById('r-role').value;
+  const cats = O.metricsForRole(role);
+  // include any parsed metric whose category isn't in the role (so nothing is lost)
+  const shownKeys = new Set();
+  cats.forEach(c => c.metrics.forEach(m => shownKeys.add(m.key)));
+  const extra = O.CATEGORIES.filter(c => !cats.includes(c) &&
+    c.metrics.some(m => draft.metrics[m.key] !== undefined && !shownKeys.has(m.key)));
+  const allCats = cats.concat(extra);
+
+  document.getElementById('metric-cards').innerHTML = allCats.map(cat => `
+    <div class="card mb">
+      <div class="card__head"><h2>${cat.icon} ${cat.label}</h2><span class="sub">${cat.outcome}</span></div>
+      <div class="card__body">
+        <div class="stat-grid">
+          ${cat.metrics.map(m => `
+            <div class="field" style="margin:0;">
+              <label style="font-size:.78rem;">${m.label}</label>
+              <input type="number" min="0" class="input m-input" data-key="${m.key}"
+                     value="${draft.metrics[m.key] !== undefined && draft.metrics[m.key] !== null ? draft.metrics[m.key] : ''}"
+                     placeholder="—" />
+            </div>`).join('')}
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+function themeOptions(sel) {
+  const themes = [{key:'other',label:'Other',icon:'📌'}].concat(O.ACTIVITY_THEMES.map(t=>({key:t.key,label:t.label,icon:t.icon})));
+  return themes.map(t => `<option value="${t.key}" ${t.key===sel?'selected':''}>${t.icon} ${t.label}</option>`).join('');
+}
+function renderActivities() {
+  const list = document.getElementById('act-list');
+  list.innerHTML = draft.activities.map((a, i) => `
+    <div class="row mb act-row" data-i="${i}" style="align-items:flex-start;">
+      <select class="select a-theme" style="width:200px; flex:0 0 200px;">${themeOptions(a.theme)}</select>
+      <input class="input a-text" value="${(a.text||'').replace(/"/g,'&quot;')}" />
+      <button class="btn btn--ghost btn--sm a-del" type="button" title="Remove">✕</button>
+    </div>`).join('') || '<p class="muted" style="font-size:.85rem;">No activities captured. Add any if needed.</p>';
+  document.getElementById('act-count').textContent = draft.activities.length + ' line' + (draft.activities.length===1?'':'s');
+  list.querySelectorAll('.a-del').forEach(b => b.onclick = e => {
+    const i = +e.target.closest('.act-row').dataset.i;
+    syncActivities(); draft.activities.splice(i,1); renderActivities();
+  });
+}
+function syncActivities() {
+  document.querySelectorAll('.act-row').forEach(row => {
+    const i = +row.dataset.i;
+    if (draft.activities[i]) {
+      draft.activities[i].text = row.querySelector('.a-text').value;
+      draft.activities[i].theme = row.querySelector('.a-theme').value;
+    }
+  });
+}
+document.getElementById('add-act').onclick = () => {
+  syncActivities();
+  draft.activities.push({ text:'', theme:'other' });
+  renderActivities();
+};
+document.getElementById('r-role').addEventListener('change', renderMetricCards);
+
+// ---- task picker ----
+function renderTaskPicker() {
+  const q = (document.getElementById('task-search').value || '').toLowerCase().trim();
+  const tasks = O.loadTasks().filter(t => !q || t.label.toLowerCase().includes(q));
+  const order = O.ACTIVITY_THEMES.map(t => t.key).concat(['other']);
+  const addedIds = new Set(draft.activities.map(a => O.taskId(a.text)));
+  const groups = order.map(tk => {
+    const items = tasks.filter(t => t.theme === tk);
+    if (!items.length) return '';
+    const th = O.ACTIVITY_THEME_INDEX[tk] || { label:'Other', icon:'📌' };
+    return `<div class="task-group__lab">${th.icon} ${th.label}</div>
+      <div class="task-chips">${items.map(t => `
+        <span class="task-chip ${addedIds.has(t.id)?'added':''}" data-id="${t.id}" data-label="${(t.label||'').replace(/"/g,'&quot;')}" data-theme="${t.theme}">
+          <span>${t.icon}</span> ${t.label}${t.custom?'<span class="badge-archived">saved</span>':''}</span>`).join('')}</div>`;
+  }).join('');
+  const box = document.getElementById('task-groups');
+  box.innerHTML = groups || '<p class="muted" style="font-size:.84rem; padding:6px 0;">No matching task — add it as a new task below.</p>';
+  // convenience: seed the new-task field with the search term when nothing matched
+  if (!groups && q) {
+    const nt = document.getElementById('nt-label');
+    if (!nt.value) nt.value = document.getElementById('task-search').value.trim();
+  }
+  box.querySelectorAll('.task-chip').forEach(ch =>
+    ch.onclick = () => toggleTask(ch.dataset.id, ch.dataset.label, ch.dataset.theme));
+}
+function toggleTask(id, label, theme) {
+  syncActivities();
+  const idx = draft.activities.findIndex(a => O.taskId(a.text) === id);
+  if (idx >= 0) draft.activities.splice(idx, 1);
+  else draft.activities.push({ text: label, theme: theme });
+  renderActivities();
+  renderTaskPicker();
+}
+document.getElementById('task-search').addEventListener('input', renderTaskPicker);
+
+// populate the new-task theme dropdown once
+document.getElementById('nt-theme').innerHTML = themeOptions('reporting');
+document.getElementById('nt-add').onclick = () => {
+  const label = document.getElementById('nt-label').value.trim();
+  const theme = document.getElementById('nt-theme').value;
+  if (!label) { toast('Type the new task first', true); return; }
+  const t = O.addTask(label, theme);           // archives to library (+ Supabase if shared)
+  syncActivities();
+  if (!draft.activities.some(a => O.taskId(a.text) === t.id)) draft.activities.push({ text: t.label, theme: t.theme });
+  document.getElementById('nt-label').value = '';
+  document.getElementById('task-search').value = '';
+  renderActivities();
+  renderTaskPicker();
+  toast('Task added & archived for future use ✓');
+};
+
+// ---- submit ----
+document.getElementById('submit-btn').onclick = async () => {
+  syncActivities();
+  // gather edited values
+  draft.name = document.getElementById('r-name').value;
+  draft.role = document.getElementById('r-role').value;
+  draft.date = document.getElementById('r-date').value;
+  draft.shift = document.getElementById('r-shift').value;
+  draft.arrival = document.getElementById('r-arrival').value || null;
+  if (!draft.name) { toast('Select who is reporting', true); return; }
+  if (!draft.date) { toast('Set the report date', true); return; }
+  const metrics = {};
+  document.querySelectorAll('.m-input').forEach(inp => {
+    if (inp.value !== '') metrics[inp.dataset.key] = parseInt(inp.value, 10);
+  });
+  draft.metrics = metrics;
+  draft.activities = draft.activities.filter(a => (a.text||'').trim());
+
+  const btn = document.getElementById('submit-btn');
+  btn.disabled = true; btn.textContent = 'Submitting…';
+  const res = await O.saveReport(draft);
+  btn.disabled = false; btn.textContent = 'Submit report ✓';
+  if (res.ok) {
+    document.getElementById('done-msg').textContent =
+      `${draft.name}'s report for ${draft.date} is saved` +
+      (res.via === 'supabase' ? ' to the shared database.' : ' (local demo mode).');
+    show('done');
+  } else {
+    toast('Could not save — try again', true);
+  }
+};
+
+document.getElementById('back-btn').onclick = () => show('paste');
+document.getElementById('another-btn').onclick = () => {
+  document.getElementById('paste').value = '';
+  document.getElementById('who').value = '';
+  show('paste');
+};
+
+// ---- helpers ----
+function show(step) {
+  ['paste','review','done'].forEach(s =>
+    document.getElementById('step-'+s).classList.toggle('hidden', s!==step));
+  window.scrollTo(0,0);
+}
+function toast(msg, err) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = 'toast show' + (err?' toast--err':'');
+  setTimeout(() => t.className = 'toast', 2600);
+}
+</script>
+</body>
+</html>

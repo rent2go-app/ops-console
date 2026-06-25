@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Ops Console — Daily Reporting</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="ops.css" />
+<style>
+  .hero { background:linear-gradient(160deg,var(--navy),var(--slate)); color:#fff; padding:64px 0 70px; }
+  .hero .eyebrow { color:#7DD3FC; }
+  .hero h1 { font-size:2.4rem; font-weight:800; letter-spacing:-1px; max-width:720px; line-height:1.15; }
+  .hero p { color:#CBD5E1; font-size:1.05rem; max-width:600px; margin-top:14px; }
+  .hero .row { margin-top:28px; }
+  .choose { display:grid; grid-template-columns:1fr 1fr; gap:18px; margin-top:-44px; }
+  .choose a { text-decoration:none; color:inherit; }
+  .choose .card { transition:.18s; height:100%; }
+  .choose .card:hover { transform:translateY(-3px); box-shadow:var(--shadow-md); }
+  .choose .ic { width:46px;height:46px;border-radius:12px;display:grid;place-items:center;font-size:22px;color:#fff;margin-bottom:14px; }
+  .feat { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:16px; margin-top:40px; }
+  .feat .f { padding:18px; }
+  .feat .f h3 { font-size:.98rem; margin-bottom:5px; }
+  .feat .f p { color:var(--muted); font-size:.86rem; }
+  @media(max-width:680px){ .choose{grid-template-columns:1fr;} .hero h1{font-size:1.8rem;} }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar__inner">
+    <a class="brand" href="index.html"><span class="brand__mark">📡</span><span>Ops Console<small>Daily Reporting</small></span></a>
+    <nav class="topnav">
+      <a href="submit.html">Submit Report</a>
+      <a href="dashboard.html">Dashboard</a>
+    </nav>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="wrap">
+    <div class="eyebrow">Core Ops · Cash Ops · Network Ops</div>
+    <h1>Daily reporting & productivity, in one place.</h1>
+    <p>Team Leaders paste their end-of-shift report. The console captures every number and task, tracks who reported, and turns it into productivity you can measure across days, weeks and months.</p>
+  </div>
+</section>
+
+<div class="wrap">
+  <div class="choose">
+    <a href="submit.html"><div class="card"><div class="card__body">
+      <div class="ic" style="background:var(--blue)">📝</div>
+      <h2 style="font-size:1.2rem;">Submit a report</h2>
+      <p class="muted" style="margin-top:6px;">For Team Leaders. Pick your name, paste your shift report, confirm the captured numbers, done in under a minute.</p>
+      <span class="btn btn--primary mt">Submit report →</span>
+    </div></div></a>
+    <a href="dashboard.html"><div class="card"><div class="card__body">
+      <div class="ic" style="background:var(--teal)">📊</div>
+      <h2 style="font-size:1.2rem;">Open the dashboard</h2>
+      <p class="muted" style="margin-top:6px;">For Ops management. See who reported today, who didn't, and measure productivity per person across any week or month.</p>
+      <span class="btn btn--dark mt">View dashboard →</span>
+    </div></div></a>
+  </div>
+
+  <div class="feat">
+    <div class="card f"><h3>🟢 Who reported today</h3><p>A live roster of submitted vs missing for any date, plus late-arrival flags and a 14-day consistency grid.</p></div>
+    <div class="card f"><h3>📈 Productivity leaderboard</h3><p>Rank leaders by output, tickets, calls and payments over this week, this month or any custom range.</p></div>
+    <div class="card f"><h3>🗂️ Outcomes, categorised</h3><p>Every metric rolls up into outcome areas — Revenue, Customer Contact, Technical, Billing, Collections, QA.</p></div>
+    <div class="card f"><h3>👤 History across months</h3><p>Pick any person and see their trend, monthly totals and every past report — expandable in full.</p></div>
+  </div>
+
+  <p class="footer-note">Runs in demo mode on this device until the shared database is switched on. See <strong>README.md</strong> to enable Supabase.</p>
+</div>
+
+</body>
+</html>
