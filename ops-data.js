@@ -22,7 +22,7 @@
      and drives "who hasn't submitted today". Edit this list to manage the team.
      Roles: 'core-ops' | 'cash-ops' | 'network-ops'                            */
   var ROSTER = [
-    { name: 'Almah',     role: 'core-ops'    },
+    { name: 'Almah',     role: 'network-ops' },
     { name: 'Tafadzwa',  role: 'core-ops'    },
     { name: 'Vanessa',   role: 'core-ops'    },
     { name: 'Lungile',   role: 'core-ops'    },
