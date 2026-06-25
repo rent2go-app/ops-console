@@ -7,12 +7,15 @@
 create table if not exists ops_reports (
   id           uuid default gen_random_uuid() primary key,
   name         text not null,                 -- team leader name (from roster)
-  role         text not null,                 -- 'core-ops' | 'cash-ops' | 'network-ops'
+  role         text not null,                 -- 'core-ops' | 'cash-ops' | 'network-ops' | 'governance'
   report_date  date not null,                 -- the shift's date
   shift        text default 'Day',
-  arrival      text,                          -- 'HH:MM' time of arrival (punctuality)
+  arrival      text,                          -- 'HH:MM' time of arrival (clock-in)
+  departure    text,                          -- 'HH:MM' time clocked out
   metrics      jsonb default '{}'::jsonb,     -- { metric_key: number, ... }
   activities   jsonb default '[]'::jsonb,     -- [ { text, theme }, ... ]
+  notes        jsonb default '{}'::jsonb,     -- { category_key: "note", ... }
+  highlights   jsonb default '{}'::jsonb,     -- { win, blocker, blocker_action, celebrate, concern }
   raw          text,                          -- original pasted report
   submitted_at timestamptz default now(),
   -- one report per person per day (re-submitting updates it)

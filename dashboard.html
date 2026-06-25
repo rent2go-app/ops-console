@@ -35,6 +35,23 @@
   .mtag { display:inline-flex; gap:5px; align-items:center; background:var(--blue-soft); color:var(--blue-dark); border-radius:7px; padding:3px 9px; font-size:.76rem; font-weight:700; margin:3px 4px 0 0; }
   .sortable { cursor:pointer; user-select:none; }
   .sortable:hover { color:var(--blue); }
+  /* scorecards */
+  .scards { display:grid; grid-template-columns:repeat(auto-fill,minmax(340px,1fr)); gap:14px; }
+  .scard { border:1px solid var(--border); border-radius:14px; background:#fff; overflow:hidden; }
+  .scard__head { display:flex; align-items:center; gap:12px; padding:14px 16px; cursor:pointer; }
+  .scard__head:hover { background:var(--bg); }
+  .scard__score { margin-left:auto; font-size:1.7rem; font-weight:800; letter-spacing:-1px; line-height:1; }
+  .scard__body { padding:0 16px 16px; display:none; }
+  .scard.open .scard__body { display:block; }
+  .pbar { display:grid; grid-template-columns:104px 1fr 96px; align-items:center; gap:10px; padding:4px 0; font-size:.82rem; }
+  .pbar .lab { font-weight:600; } .pbar .val { text-align:right; font-variant-numeric:tabular-nums; color:var(--muted); font-size:.76rem; }
+  .ttargets { margin-top:8px; border-top:1px dashed var(--border); padding-top:8px; }
+  .ttargets .tt { display:grid; grid-template-columns:1fr auto auto; gap:8px; align-items:center; padding:3px 0; font-size:.8rem; }
+  .tt .tdot { width:8px; height:8px; border-radius:50%; display:inline-block; margin-right:6px; }
+  .score-band { font-size:.66rem; font-weight:800; padding:2px 8px; border-radius:999px; text-transform:uppercase; letter-spacing:.4px; }
+  .health-wrap { display:flex; gap:26px; align-items:center; flex-wrap:wrap; }
+  .health-num { font-size:3.2rem; font-weight:800; letter-spacing:-2px; line-height:1; }
+  .health-bars { flex:1; min-width:260px; }
 </style>
 </head>
 <body>
@@ -116,6 +133,11 @@
     <div class="stat-grid mb" id="prd-kpis"></div>
 
     <div class="card mb">
+      <div class="card__head"><h2>🩺 Team Health Score</h2><span class="sub">is the function healthy, not just busy?</span></div>
+      <div class="card__body" id="prd-health"></div>
+    </div>
+
+    <div class="card mb">
       <div class="card__head"><h2>📆 Daily team outputs</h2><span class="sub">what was delivered each day</span></div>
       <div class="card__body" style="overflow-x:auto;">
         <table class="tbl" id="prd-daily"></table>
@@ -128,10 +150,8 @@
     </div>
 
     <div class="card mb">
-      <div class="card__head"><h2>👥 Individual outputs</h2><span class="sub">per person · not a ranking</span></div>
-      <div class="card__body" style="overflow-x:auto;">
-        <table class="tbl" id="prd-individual"></table>
-      </div>
+      <div class="card__head"><h2>👥 Leader scorecards</h2><span class="sub">productivity score per person · tap to see targets</span></div>
+      <div class="card__body"><div class="scards" id="prd-scorecards"></div></div>
     </div>
   </section>
 
@@ -214,7 +234,7 @@ async function boot(){
   document.getElementById('prd-role').innerHTML = roleOpts;
   // person picker
   document.getElementById('hist-person').innerHTML =
-    O.ROSTER.map(p=>`<option value="${p.name}">${p.name}</option>`).join('');
+    O.ROSTER.map(p=>`<option value="${p.name}">${p.fullName}</option>`).join('');
   // metric picker (history)
   document.getElementById('hist-metric').innerHTML =
     '<option value="__output">Work done (all output metrics)</option>' +
@@ -271,14 +291,14 @@ function renderTracker(){
       badge = lateSub
         ? `<span class="badge badge--amber">Late${st?' · '+st:''}</span>`
         : `<span class="badge badge--green">On time${st?' · '+st:''}</span>`;
-      info = `🕘 Submitted ${submittedLabel(rep)}  ·  🚶 Arrived ${rep.arrival||'—'}`;
+      info = `🕘 Sent ${submittedLabel(rep)} · 🚶 In ${rep.arrival||'—'} · 🏁 Out ${rep.departure||'—'}`;
     } else {
       badge = `<span class="badge badge--red">Missing</span>`;
       info = 'No report submitted';
     }
     return `<div class="status-card ${rep?'':'miss'}">
-      <span class="avatar" style="background:${avatarColor(p.name)}">${initials(p.name)}</span>
-      <div class="meta"><div class="nm">${p.name}</div><div class="rl">${O.ROLES[p.role].label}</div><div class="rl" style="margin-top:2px;">${info}</div></div>
+      <span class="avatar" style="background:${avatarColor(p.name)}">${initials(p.fullName)}</span>
+      <div class="meta"><div class="nm">${p.fullName}</div><div class="rl">${O.ROLES[p.role].label}</div><div class="rl" style="margin-top:2px;">${info}</div></div>
       <span class="spacer"></span>${badge}</div>`;
   }).join('');
   document.getElementById('trk-grid').innerHTML = cards;
@@ -302,7 +322,7 @@ function renderTracker(){
       return `<span class="dot ${cls}" title="${d}${has?' ✓':''}"></span>`;
     }).join('');
     return `<div class="row mb" style="gap:14px;">
-      <div style="width:120px; font-weight:600; font-size:.85rem;">${p.name}</div>
+      <div style="width:150px; font-weight:600; font-size:.85rem;">${p.fullName}</div>
       <div class="dotgrid">${dots}</div></div>`;
   }).join('');
 }
@@ -386,25 +406,111 @@ function renderProductivity(){
   document.getElementById('prd-outcomes').innerHTML = catTotals.length? catTotals.map(c=>bar(c.icon+' '+c.label, c.total, maxCat)).join('')
     : '<p class="empty">No metric data in this period.</p>';
 
-  // ---- INDIVIDUAL outputs (per person, roster order — NOT ranked) ----
-  const iCols = [
-    {lab:'Reports', f:rr=>rr.length},
-    {lab:'On-time', f:rr=>rr.length? Math.round((rr.length-rr.filter(submissionLate).length)/rr.length*100)+'%':'—'},
-    {lab:'Collected', f:rr=>sumMetric(rr,'dl_amount'), money:true},
-    {lab:'Paid', f:rr=>sumMetric(rr,'paid_clients')},
-    {lab:'Tkts resolved', f:rr=>sumMetric(rr,'tickets_resolved')},
-    {lab:'Payments', f:rr=>sumMetric(rr,'payments_captured')},
-    {lab:'Calls', f:rr=>callsOf(rr)},
-    {lab:'QA', f:rr=>qaOf(rr)},
+  // ---- expected working days (consistency + health) ----
+  const effFrom = from==='0000-01-01' ? minDate(rows) : from;
+  const effTo = to>todayISO()? todayISO() : to;
+  const expectedDays = countWorkdays(effFrom, effTo) || (new Set(rows.map(r=>r.report_date)).size) || 1;
+
+  // ---- TEAM HEALTH ----
+  renderTeamHealth(rows, roster, expectedDays);
+
+  // ---- LEADER SCORECARDS (per person, roster order — NOT ranked) ----
+  document.getElementById('prd-scorecards').innerHTML = roster.map(p=>{
+    const rr = rows.filter(r=>r.name===p.name);
+    const s = scoreLeader(rr, p.role, expectedDays);
+    const band = scoreBand(s.total);
+    const pills = s.pillars.filter(pl=>pl.has);
+    return `<div class="scard">
+      <div class="scard__head">
+        <span class="avatar" style="background:${avatarColor(p.name)}">${initials(p.fullName)}</span>
+        <div><div style="font-weight:700;">${p.fullName}</div><div class="muted" style="font-size:.74rem;">${O.ROLES[p.role].label} · ${rr.length} report${rr.length===1?'':'s'}</div></div>
+        <span class="scard__score" style="color:${rr.length?band.color:'var(--muted-2)'}">${rr.length? s.total : '—'}</span>
+      </div>
+      <div class="scard__body">
+        ${pills.map(pl=>pbar(pl.icon+' '+pl.label, pl.score)).join('')}
+        <div class="ttargets">${pills.flatMap(pl=>pl.items).map(it=>{
+          const col = it.pct===null? 'var(--muted-2)' : it.pct>=1?'var(--emerald)':it.pct>=0.5?'var(--amber)':'var(--red)';
+          return `<div class="tt"><span><span class="tdot" style="background:${col}"></span>${it.label}</span><span class="muted">${it.display}</span><span style="font-weight:700;color:${col}">${it.pct===null?'n/a':Math.round(it.pct*100)+'%'}</span></div>`;
+        }).join('')}</div>
+      </div></div>`;
+  }).join('');
+  document.querySelectorAll('#prd-scorecards .scard__head').forEach(h=> h.onclick=()=> h.parentElement.classList.toggle('open'));
+}
+
+/* ---------- SCORING ENGINE ---------- */
+function metricSum(rows, keys){ return rows.reduce((s,r)=> s + keys.reduce((a,k)=>{const v=(r.metrics||{})[k]; return a+(typeof v==='number'?v:0);},0), 0); }
+function scoreBand(s){ if(s>=75) return {color:'var(--emerald)',label:'strong'}; if(s>=50) return {color:'var(--amber)',label:'fair'}; return {color:'var(--red)',label:'low'}; }
+function pbar(label, score){ const c=scoreBand(score); return `<div class="pbar"><div class="lab">${label}</div><div class="bar-track"><div class="bar-fill" style="width:${score}%;background:${c.color}"></div></div><div class="val">${score}/100</div></div>`; }
+function pillarDetail(rows, defs){
+  const n=rows.length;
+  const items=(defs||[]).map(d=>{
+    if(d.ratioNum){
+      const num=metricSum(rows,d.ratioNum), den=metricSum(rows,d.ratioDen);
+      const applicable=den>0, rate=applicable?num/den:0;
+      const pct=applicable? Math.min(1, rate/d.target):null;
+      return {label:d.label, pct, display: applicable? (Math.round(rate*100)+'% / '+Math.round(d.target*100)+'%') : '—'};
+    }
+    const actual=metricSum(rows,d.keys), tgt=d.target*Math.max(1,n);
+    return {label:d.label, pct:Math.min(1, actual/tgt), display:(d.money?fmtMoney(actual):actual)+' / '+(d.money?fmtMoney(tgt):tgt)};
+  });
+  const valid=items.filter(i=>i.pct!==null);
+  const score=(!n||!valid.length)?0:Math.round(valid.reduce((s,i)=>s+i.pct,0)/valid.length*100);
+  return {score, items};
+}
+function timelinessDetail(rows, expectedDays){
+  const n=rows.length; if(!n) return {score:0, items:[]};
+  const onTime=rows.filter(r=>!submissionLate(r)).length, onTimeRate=onTime/n;
+  const consistency=expectedDays? Math.min(1,n/expectedDays):1;
+  const withArr=rows.filter(r=>r.arrival);
+  const punctual=withArr.length? withArr.filter(r=>r.arrival<=O.SHIFT_START).length/withArr.length : null;
+  const blend = punctual===null? (0.65*onTimeRate+0.35*consistency) : (0.5*onTimeRate+0.3*consistency+0.2*punctual);
+  const items=[
+    {label:'Reports in by 9 PM', pct:onTimeRate, display:onTime+'/'+n},
+    {label:'Reporting consistency', pct:consistency, display:(expectedDays? n+'/'+expectedDays:n)+' days'}
   ];
-  document.getElementById('prd-individual').innerHTML =
-    `<thead><tr><th>Leader</th><th>Role</th>${iCols.map(c=>`<th class="num">${c.lab}</th>`).join('')}</tr></thead>
-     <tbody>${roster.map(p=>{ const rr=rows.filter(r=>r.name===p.name);
-        return `<tr>
-          <td class="name"><div class="row"><span class="avatar" style="width:26px;height:26px;font-size:.68rem;background:${avatarColor(p.name)}">${initials(p.name)}</span>${p.name}</div></td>
-          <td class="muted" style="font-size:.8rem;">${O.ROLES[p.role].label}</td>
-          ${iCols.map(c=>`<td class="num" ${rr.length?'':'style=\"opacity:.4\"'}>${c.money?(c.f(rr)?fmtMoney(c.f(rr)):'—'):c.f(rr)}</td>`).join('')}</tr>`;
-     }).join('')}</tbody>`;
+  if(punctual!==null) items.push({label:'Punctual (≤'+O.SHIFT_START+')', pct:punctual, display:Math.round(punctual*100)+'%'});
+  return {score:Math.round(blend*100), items};
+}
+function scoreLeader(rows, role, expectedDays){
+  const sc=O.ROLE_SCORECARD[role]||{}, W=O.SCORE_WEIGHTS;
+  const pillars=[
+    Object.assign({key:'throughput',label:'Throughput',icon:'⚙️',w:W.throughput,has:(sc.throughput||[]).length>0}, pillarDetail(rows, sc.throughput)),
+    Object.assign({key:'quality',label:'Quality',icon:'✅',w:W.quality,has:(sc.quality||[]).length>0}, pillarDetail(rows, sc.quality)),
+    Object.assign({key:'timeliness',label:'Timeliness',icon:'🕘',w:W.timeliness,has:true}, timelinessDetail(rows, expectedDays)),
+    Object.assign({key:'value',label:'Value',icon:'💰',w:W.value,has:(sc.value||[]).length>0}, pillarDetail(rows, sc.value))
+  ];
+  const active=pillars.filter(p=>p.has), wsum=active.reduce((s,p)=>s+p.w,0)||1;
+  const total=rows.length? Math.round(active.reduce((s,p)=>s+p.score*p.w,0)/wsum):0;
+  return {total, pillars};
+}
+function renderTeamHealth(rows, roster, expectedDays){
+  const reports=rows.length, expected=roster.length*(expectedDays||0);
+  const submissionRate=expected? Math.min(1,reports/expected):(reports?1:0);
+  const onTimeRate=reports? rows.filter(r=>!submissionLate(r)).length/reports:0;
+  const resolved=metricSum(rows,['tickets_resolved']), escalated=metricSum(rows,['tickets_escalated']);
+  const resolution=(resolved+escalated)? resolved/(resolved+escalated):null;
+  let expCollect=0; roster.forEach(p=>{ ((O.ROLE_SCORECARD[p.role]||{}).value||[]).forEach(d=>{ if(d.money) expCollect+=d.target*(expectedDays||1); }); });
+  const collected=metricSum(rows,['dl_amount']);
+  const valueDelivery=expCollect? Math.min(1, collected/expCollect):(collected?1:0);
+  const comps=[
+    {label:'Submission rate', w:0.25, pct:submissionRate, detail:reports+(expected?' / '+expected:'')+' reports'},
+    {label:'On-time (by 9 PM)', w:0.20, pct:onTimeRate, detail:Math.round(onTimeRate*100)+'%'},
+    {label:'Resolution effectiveness', w:0.30, pct:resolution===null?0:resolution, detail:resolution===null?'n/a':Math.round(resolution*100)+'%', na:resolution===null},
+    {label:'Value delivery', w:0.25, pct:valueDelivery, detail:fmtMoney(collected)+(expCollect?' / '+fmtMoney(expCollect):'')}
+  ];
+  const active=comps.filter(c=>!c.na), wsum=active.reduce((s,c)=>s+c.w,0)||1;
+  const score=reports? Math.round(active.reduce((s,c)=>s+c.pct*c.w,0)/wsum*100):0;
+  const band=scoreBand(score);
+  document.getElementById('prd-health').innerHTML=`
+    <div class="health-wrap">
+      <div style="text-align:center;min-width:90px;">
+        <div class="health-num" style="color:${reports?band.color:'var(--muted-2)'}">${reports?score:'—'}</div>
+        <span class="score-band" style="background:var(--bg);color:${band.color}">${reports?band.label:'no data'}</span>
+      </div>
+      <div class="health-bars">
+        ${comps.map(c=>`<div class="pbar"><div class="lab">${c.label}</div><div class="bar-track"><div class="bar-fill" style="width:${Math.round((c.na?0:c.pct)*100)}%;background:${c.na?'var(--muted-2)':scoreBand(Math.round(c.pct*100)).color}"></div></div><div class="val">${c.detail}</div></div>`).join('')}
+      </div>
+    </div>`;
 }
 function countWorkdays(from,to){
   if (!from||from==='0000-01-01'||to==='9999-12-31') return 0;
@@ -453,30 +559,65 @@ function renderHistory(){
      }).join('')}</tbody>`;
 
   // report list (expandable)
+  const fullName = O.fullNameOf(name);
   document.getElementById('hist-reports').innerHTML = rows.slice().reverse().map((r,idx)=>{
     const mtags = Object.keys(r.metrics||{}).filter(k=>O.METRIC_INDEX[k]).map(k=>
-      `<span class="mtag">${O.METRIC_INDEX[k].metric.label}: ${r.metrics[k]}</span>`).join('') || '<span class="muted" style="font-size:.8rem;">No metrics</span>';
+      `<span class="mtag">${O.METRIC_INDEX[k].metric.label}: ${O.METRIC_INDEX[k].metric.money?fmtMoney(r.metrics[k]):r.metrics[k]}</span>`).join('') || '<span class="muted" style="font-size:.8rem;">No metrics</span>';
     const acts = (r.activities||[]).map(a=>{
       const th = O.ACTIVITY_THEME_INDEX[a.theme]||{icon:'📌',label:'Other'};
       return `<div style="padding:5px 0; font-size:.86rem;"><span class="theme-chip">${th.icon} ${th.label}</span> ${escapeHtml(a.text)}</div>`;
     }).join('') || '<p class="muted" style="font-size:.84rem;">No activities.</p>';
+    // highlights
+    const H = r.highlights||{};
+    const hbits = [H.win&&['🏆 Win',H.win], (H.blocker||H.blocker_action)&&['🚧 Blocker',(H.blocker||'')+(H.blocker_action?(' — close-gap: '+H.blocker_action):'')], H.celebrate&&['🎉 Celebrate',H.celebrate], H.concern&&['⚠️ Concern',H.concern]].filter(Boolean);
+    const highlightsHtml = hbits.length? '<div class="mb">'+hbits.map(b=>`<div style="font-size:.84rem;padding:3px 0;"><strong>${b[0]}:</strong> ${escapeHtml(b[1])}</div>`).join('')+'</div>':'';
+    // per-block notes
+    const N = r.notes||{};
+    const noteRows = Object.keys(N).filter(k=>N[k]).map(k=>{ const cat=O.CATEGORIES.find(c=>c.key===k)||{label:k,icon:'📝'}; return `<div style="font-size:.82rem;padding:3px 0;"><span class="theme-chip">${cat.icon} ${cat.label}</span> ${escapeHtml(N[k])}</div>`; }).join('');
+    const notesBlock = noteRows? '<div class="mb"><strong style="font-size:.82rem;">Notes</strong>'+noteRows+'</div>':'';
     const lateSub = submissionLate(r);
-    return `<div class="rep-item" data-i="${idx}">
+    const locked = O.isLocked(r);
+    const actions = locked
+      ? `<span class="badge badge--gray" title="Locked ${O.EDIT_WINDOW_HOURS}h after submission">🔒 Locked</span>`
+      : `<button class="btn btn--ghost btn--sm rep-edit" data-date="${r.report_date}">✏️ Edit</button>
+         <button class="btn btn--ghost btn--sm rep-del" data-date="${r.report_date}" title="Delete" style="color:var(--red)">🗑</button>`;
+    return `<div class="rep-item" data-date="${r.report_date}">
       <div class="rep-head">
-        <span class="avatar" style="width:30px;height:30px;font-size:.74rem;background:${avatarColor(name)}">${initials(name)}</span>
-        <div><div style="font-weight:700;">${r.report_date}</div><div class="muted" style="font-size:.76rem;">${r.shift||'Day'} shift · 🕘 submitted ${submittedLabel(r)} · 🚶 arrived ${r.arrival||'—'}${lateSub?' · <span style="color:var(--amber);font-weight:700;">late</span>':''}</div></div>
+        <span class="avatar" style="width:30px;height:30px;font-size:.74rem;background:${avatarColor(name)}">${initials(fullName)}</span>
+        <div><div style="font-weight:700;">${r.report_date}</div><div class="muted" style="font-size:.76rem;">${r.shift||'Day'} · 🕘 sent ${submittedLabel(r)} · 🚶 in ${r.arrival||'—'} · 🏁 out ${r.departure||'—'}${lateSub?' · <span style="color:var(--amber);font-weight:700;">late</span>':''}</div></div>
         <span class="spacer"></span>
+        ${actions}
         <span class="badge ${lateSub?'badge--amber':'badge--green'}">${lateSub?'Late':'On time'}</span>
-        <span class="badge badge--blue">Work done ${workDone(r)}</span>
-        <span class="muted" style="font-size:1.1rem;">⌄</span>
+        <span class="badge badge--blue">Work ${workDone(r)}</span>
       </div>
       <div class="rep-body">
         <div class="divider"></div>
+        ${highlightsHtml}
         <div class="mb">${mtags}</div>
+        ${notesBlock}
         <strong style="font-size:.82rem;">Activities</strong>${acts}
       </div></div>`;
-  }).join('') || '<p class="empty"><div class="empty__icon">📭</div>No reports on record for '+name+'.</p>';
-  document.querySelectorAll('#hist-reports .rep-head').forEach(h => h.onclick = () => h.parentElement.classList.toggle('open'));
+  }).join('') || ('<p class="empty"><div class="empty__icon">📭</div>No reports on record for '+fullName+'.</p>');
+  // expand on header click (but not when clicking the edit/delete buttons)
+  document.querySelectorAll('#hist-reports .rep-head').forEach(h => h.onclick = (e) => {
+    if (e.target.closest('.rep-edit') || e.target.closest('.rep-del')) return;
+    h.parentElement.classList.toggle('open');
+  });
+  document.querySelectorAll('#hist-reports .rep-edit').forEach(b => b.onclick = (e) => {
+    e.stopPropagation();
+    const r = ALL.find(x => x.name===name && x.report_date===b.dataset.date);
+    if (!r) return;
+    sessionStorage.setItem('ops_edit', JSON.stringify(r));
+    window.location.href = 'submit.html';
+  });
+  document.querySelectorAll('#hist-reports .rep-del').forEach(b => b.onclick = async (e) => {
+    e.stopPropagation();
+    if (!confirm('Delete '+fullName+"'s report for "+b.dataset.date+'? This cannot be undone.')) return;
+    await O.deleteReport(name, b.dataset.date);
+    ALL = await O.loadReports();
+    ALL.forEach(r => { r.metrics=r.metrics||{}; r.activities=r.activities||[]; });
+    renderTracker(); renderProductivity(); renderHistory();
+  });
 }
 
 /* ---------- shared render helpers ---------- */

@@ -22,21 +22,31 @@
      and drives "who hasn't submitted today". Edit this list to manage the team.
      Roles: 'core-ops' | 'cash-ops' | 'network-ops'                            */
   var ROSTER = [
-    { name: 'Almah',     role: 'network-ops' },
-    { name: 'Tafadzwa',  role: 'core-ops'    },
-    { name: 'Vanessa',   role: 'core-ops'    },
-    { name: 'Lungile',   role: 'core-ops'    },
-    { name: 'Rorisang',  role: 'core-ops'    },
-    { name: 'Chirwa',    role: 'core-ops'    },
-    { name: 'Abigail',   role: 'cash-ops'    },
-    { name: 'Abitania',  role: 'network-ops' }
+    // Sorted alphabetically by first name. `name` is the stable matching key
+    // used in reports + the database; `fullName` is for display.
+    { name: 'Abigail',     fullName: 'Abigail Ncube',        role: 'cash-ops'    },
+    { name: 'Abitania',    fullName: 'Abitania Gwara',       role: 'network-ops' },
+    { name: 'Almah',       fullName: 'Almah Furayi',         role: 'network-ops' },
+    { name: 'Chirwa',      fullName: 'Amos Chirwa',          role: 'governance'  },
+    { name: 'Lungile',     fullName: 'Lungile Khanye',       role: 'core-ops'    },
+    { name: 'Omniscience', fullName: 'Omniscience Musungah', role: 'core-ops'    },
+    { name: 'Rorisang',    fullName: 'Rorisang Mvundla',     role: 'core-ops'    },
+    { name: 'Tafadzwa',    fullName: 'Tafadzwa Maribha',     role: 'core-ops'    },
+    { name: 'Vanessa',     fullName: 'Vanessa Sakhala',      role: 'governance'  }
   ];
 
   var ROLES = {
-    'core-ops':    { label: 'Core Ops Leader',    icon: '🛠️' },
-    'cash-ops':    { label: 'Cash Ops Leader',    icon: '💳' },
-    'network-ops': { label: 'Network Ops Leader', icon: '📡' }
+    'core-ops':    { label: 'Core Ops Leader',         icon: '🛠️' },
+    'cash-ops':    { label: 'Cash Ops Leader',         icon: '💳' },
+    'network-ops': { label: 'Network Ops Leader',      icon: '📡' },
+    'governance':  { label: 'Governance & Compliance', icon: '🛡️' }
   };
+
+  // name (matching key) -> full display name
+  function fullNameOf(name) {
+    var p = ROSTER.filter(function (r) { return r.name === name; })[0];
+    return p ? p.fullName : name;
+  }
 
   /* ---- 2. METRIC SCHEMA ----------------------------------------------------
      Categories map to OUTCOMES (what the business cares about). Each metric has
@@ -48,7 +58,7 @@
       key: 'diamond', label: 'Diamond League', icon: '💎',
       outcome: 'Revenue & Sales',
       headers: ['diamond league', 'diamond'],
-      roles: ['core-ops', 'cash-ops'],
+      roles: ['core-ops', 'cash-ops', 'governance'],
       metrics: [
         { key: 'paid_clients', label: 'Paid Clients',  aliases: ['paid clients'] },
         { key: 'dl_amount',    label: 'Amount Collected ($)', money: true, aliases: ['amount collected', 'total collected', 'collections amount', 'amount in', 'amount came in', 'revenue collected', 'amount banked', 'value collected'] },
@@ -57,13 +67,13 @@
       ]
     },
     {
-      key: 'sweep', label: 'Clear & Sweep', icon: '🧹',
+      key: 'sweep', label: 'Omnichannel', icon: '💬',
       outcome: 'Customer Contact',
-      headers: ['clear & sweep', 'clear and sweep', 'clear &amp; sweep'],
-      roles: ['core-ops', 'cash-ops'],
+      headers: ['omnichannel', 'clear & sweep', 'clear and sweep', 'clear &amp; sweep'],
+      roles: ['core-ops', 'cash-ops', 'governance'],
       metrics: [
         { key: 'cs_emails',       label: 'Emails Sent',      aliases: ['emails sent', 'emails'] },
-        { key: 'cs_whatsapps',    label: 'WhatsApps Sent/Answered', aliases: ['whatsapps sent', 'whatsapps answered', 'whatsapp sent', 'whatsapps', 'whatsapp'] },
+        { key: 'cs_whatsapps',    label: 'WhatsApps Addressed', aliases: ['whatsapps addressed', 'whatsapps sent', 'whatsapps answered', 'whatsapp sent', 'whatsapps', 'whatsapp'] },
         { key: 'tickets_updated', label: 'Tickets Updated',  aliases: ['tickets updated', 'tickets'] },
         { key: 'inbound_calls',   label: 'Inbound Calls',    aliases: ['inbound calls', 'incoming calls'] },
         { key: 'outbound_calls',  label: 'Outbound Calls',   aliases: ['outbound calls'] },
@@ -75,7 +85,7 @@
       key: 'tech', label: 'Technical Support & Escalations', icon: '🎫',
       outcome: 'Technical Resolution',
       headers: ['technical support & escalations', 'technical support and escalations', 'technical support'],
-      roles: ['core-ops', 'cash-ops'],
+      roles: ['core-ops', 'cash-ops', 'governance'],
       metrics: [
         { key: 'second_line',       label: '2nd-Line Tickets Worked', aliases: ['2nd line tickets worked on', 'tickets worked on 2nd line', '2nd line tickets', 'tickets worked on 2nd line', '2nd line'] },
         { key: 'tickets_resolved',  label: 'Tickets Resolved',  aliases: ['tickets resolved'] },
@@ -89,7 +99,7 @@
       key: 'billing', label: 'Billing Operations', icon: '💳',
       outcome: 'Billing & Cash',
       headers: ['billing operations', 'billing'],
-      roles: ['core-ops', 'cash-ops'],
+      roles: ['core-ops', 'cash-ops', 'governance'],
       metrics: [
         { key: 'payments_captured',  label: 'Payments Captured',  aliases: ['payments captured'] },
         { key: 'payments_confirmed', label: 'Payments Confirmed (Bank)', aliases: ['payments confirmed on bank statement', 'payments confirmed'] },
@@ -104,7 +114,7 @@
       key: 'collections', label: 'Collections & Receivables', icon: '📉',
       outcome: 'Collections',
       headers: ['collections', 'collections & receivables'],
-      roles: ['core-ops', 'cash-ops'],
+      roles: ['core-ops', 'cash-ops', 'governance'],
       metrics: [
         { key: 'chidzoka',         label: 'Chidzoka Collections', aliases: ['chidzoka collections', 'chidzoka'] },
         { key: 'aged_receivables', label: 'Aged Receivables',     aliases: ['aged receivables'] },
@@ -115,14 +125,103 @@
       key: 'qa', label: 'Quality Assurance', icon: '✅',
       outcome: 'Quality & Compliance',
       headers: ['quality assurance', 'qa'],
-      roles: ['core-ops', 'cash-ops', 'network-ops'],
+      roles: ['core-ops', 'cash-ops', 'network-ops', 'governance'],
       metrics: [
         { key: 'qa_evaluations', label: 'QA Evaluations', aliases: ['quality assurance evaluations', 'qa evaluations'] },
         { key: 'credit_notes',   label: 'Credit Notes Reviewed', aliases: ['credit notes'] },
         { key: 'follow_ups',     label: 'Follow-ups',     aliases: ['follow-ups to clear', 'follow ups', 'follow-ups'] }
       ]
+    },
+    {
+      key: 'network', label: 'Network Operations', icon: '📡',
+      outcome: 'Network & Field',
+      headers: ['network operations', 'network ops', 'field operations'],
+      roles: ['network-ops'],
+      metrics: [
+        { key: 'faults_attended',     label: 'Faults Attended / Closed',  aliases: ['faults attended', 'faults closed', 'area faults', 'active faults', 'faults resolved'] },
+        { key: 'qa_checks',           label: 'QA Checks Performed',       aliases: ['qa checks', 'quality assurance checks'] },
+        { key: 'installs_validated',  label: 'Installations Validated',   aliases: ['installations validated', 'installs validated', 'installations completed'] },
+        { key: 'timesheets_validated',label: 'Timesheets Validated',      aliases: ['timesheets validated', 'validated timesheets', 'overtime timesheets'] },
+        { key: 'tasks_cleared',       label: 'Tasks Followed-up / Cleared', aliases: ['tasks cleared', 'tasks followed up', 'scheduled tasks'] },
+        { key: 'fleet_allocated',     label: 'Fleet Requests Allocated',  aliases: ['fleet requests allocated', 'fleet allocated', 'fleet requests'] },
+        { key: 'projects_progressed', label: 'Projects Progressed',       aliases: ['projects progressed', 'project updates'] }
+      ]
     }
   ];
+
+  /* ---- SCORING FRAMEWORK ----------------------------------------------------
+     Drives the Productivity Score (per leader) and Team Health Score. Targets
+     are a "solid day" — edit them as you calibrate. See METRICS-FRAMEWORK.md.
+     Each pillar metric: { label, keys:[...summed...], target } OR a ratio
+     { label, ratioNum:[...], ratioDen:[...], target } (e.g. resolution rate).  */
+  var SCORE_WEIGHTS = { throughput: 0.40, quality: 0.25, timeliness: 0.20, value: 0.15 };
+  var SHIFT_START = '08:30';   // arrival at/under this counts as punctual
+  var REPORT_DUE_HOUR = 21;    // 9:00 PM submission cut-off
+
+  var ROLE_SCORECARD = {
+    'core-ops': {
+      throughput: [
+        { label: 'Tickets resolved',        keys: ['tickets_resolved'], target: 5 },
+        { label: 'Tickets closed + updated', keys: ['tickets_closed', 'tickets_updated'], target: 12 },
+        { label: 'Calls handled',           keys: ['inbound_calls', 'outbound_calls', 'dl_calls'], target: 12 },
+        { label: 'Payments captured',       keys: ['payments_captured'], target: 3 }
+      ],
+      quality: [
+        { label: 'QA done',          keys: ['qa_evaluations', 'credit_notes'], target: 5 },
+        { label: 'Resolution rate',  ratioNum: ['tickets_resolved'], ratioDen: ['tickets_resolved', 'tickets_escalated'], target: 0.60 }
+      ],
+      value: [
+        { label: 'Amount collected', keys: ['dl_amount'], target: 300, money: true },
+        { label: 'Paid clients',     keys: ['paid_clients'], target: 1 }
+      ]
+    },
+    'cash-ops': {
+      throughput: [
+        { label: 'Walk-ins attended',          keys: ['walkins'], target: 6 },
+        { label: 'Payments captured + confirmed', keys: ['payments_captured', 'payments_confirmed'], target: 6 },
+        { label: 'Bank approvals',             keys: ['bank_approvals'], target: 5 },
+        { label: 'Calls + WhatsApps',          keys: ['inbound_calls', 'outbound_calls', 'cs_whatsapps'], target: 10 }
+      ],
+      quality: [
+        { label: 'Reconciliations',     keys: ['account_recons'], target: 15 },
+        { label: 'Internal customers',  keys: ['internal_customers'], target: 3 }
+      ],
+      value: [
+        { label: 'Cash disbursed',   keys: ['cash_disbursed'], target: 4 },
+        { label: 'Amount collected', keys: ['dl_amount'], target: 250, money: true }
+      ]
+    },
+    'network-ops': {
+      throughput: [
+        { label: 'Faults attended / closed', keys: ['faults_attended'], target: 4 },
+        { label: 'Tasks cleared',            keys: ['tasks_cleared'], target: 8 },
+        { label: 'Installs validated',       keys: ['installs_validated'], target: 4 }
+      ],
+      quality: [
+        { label: 'QA checks',           keys: ['qa_checks', 'qa_evaluations'], target: 5 },
+        { label: 'Timesheets validated', keys: ['timesheets_validated'], target: 2 }
+      ],
+      value: [
+        { label: 'Fleet allocated',     keys: ['fleet_allocated'], target: 3 },
+        { label: 'Projects progressed', keys: ['projects_progressed'], target: 1 }
+      ]
+    },
+    'governance': {
+      throughput: [
+        { label: 'QA evaluations + credit notes', keys: ['qa_evaluations', 'credit_notes'], target: 6 },
+        { label: 'Reconciliations reviewed',      keys: ['account_recons'], target: 5 },
+        { label: 'Follow-ups cleared',            keys: ['follow_ups'], target: 10 }
+      ],
+      quality: [
+        { label: 'Resolution rate', ratioNum: ['tickets_resolved'], ratioDen: ['tickets_resolved', 'tickets_escalated'], target: 0.60 },
+        { label: 'QA coverage',     keys: ['qa_evaluations', 'credit_notes'], target: 6 }
+      ],
+      value: [
+        { label: 'Payments captured', keys: ['payments_captured'], target: 2 },
+        { label: 'Amount collected',  keys: ['dl_amount'], target: 200, money: true }
+      ]
+    }
+  };
 
   // Flat lookup: metric key -> {category, metric}
   var METRIC_INDEX = {};
@@ -354,10 +453,12 @@
   function parseReport(raw) {
     var lines = raw.split(/\r?\n/);
     var person = matchRosterName(raw);
-    var role = detectRole(raw) || (person && person.role) || 'core-ops';
+    // The roster is authoritative for a known leader's role; fall back to the
+    // report title only for people not on the roster.
+    var role = (person && person.role) || detectRole(raw) || 'core-ops';
 
     // Metadata scan
-    var date = null, arrival = null, shift = null;
+    var date = null, arrival = null, departure = null, shift = null;
     lines.forEach(function (ln) {
       var lc = ln.toLowerCase();
       if (!date && /date/.test(lc)) date = parseDate(ln);
@@ -372,6 +473,7 @@
       if (!arrival && person && lc.indexOf(person.name.toLowerCase()) !== -1 && /\|/.test(ln)) {
         arrival = parseTime(ln);
       }
+      if (!departure && /(depart|clock[- ]?out|clocked out|knock[- ]?off|time out|sign[- ]?out|left at)/.test(lc)) departure = parseTime(ln);
       if (!shift && /shift/.test(lc)) {
         if (/night/.test(lc)) shift = 'Night'; else if (/day/.test(lc)) shift = 'Day';
       }
@@ -416,8 +518,11 @@
       date: date,
       shift: shift || 'Day',
       arrival: arrival,
+      departure: departure,   // clock-out time
       metrics: metrics,
       activities: activities,
+      notes: {},              // per-category notes, keyed by category key
+      highlights: {},         // win / blocker / blocker_action / celebrate / concern
       raw: raw
     };
   }
@@ -443,8 +548,11 @@
       report_date: report.date,
       shift: report.shift,
       arrival: report.arrival,
+      departure: report.departure || null,
       metrics: report.metrics,
       activities: report.activities,
+      notes: report.notes || {},
+      highlights: report.highlights || {},
       raw: report.raw,
       submitted_at: new Date().toISOString()
     };
@@ -489,6 +597,27 @@
     return Promise.resolve(lsAll());
   }
 
+  // Reports can be edited / removed for this many hours after submission.
+  var EDIT_WINDOW_HOURS = 48;
+  function isLocked(row) {
+    if (!row || !row.submitted_at) return false;
+    var sub = new Date(row.submitted_at).getTime();
+    if (isNaN(sub)) return false;
+    return (Date.now() - sub) > EDIT_WINDOW_HOURS * 3600 * 1000;
+  }
+
+  // Delete a report (within the edit window). Returns Promise<{ok}>.
+  function deleteReport(name, reportDate) {
+    var all = lsAll().filter(function (r) { return !(r.name === name && r.report_date === reportDate); });
+    lsWrite(all);
+    if (hasSupabase) {
+      return global._supabase.from('ops_reports').delete().eq('name', name).eq('report_date', reportDate)
+        .then(function () { return { ok: true }; })
+        .catch(function () { return { ok: true, via: 'local' }; });
+    }
+    return Promise.resolve({ ok: true });
+  }
+
   /* ---- 6. SEED -------------------------------------------------------------
      The pasted sample reports, so the dashboard isn't empty on first open.
      Only seeds localStorage if it's empty. Never touches Supabase.            */
@@ -512,7 +641,8 @@
       var p = parseReport(raw);
       return {
         name: p.name, role: p.role, report_date: p.date, shift: p.shift,
-        arrival: p.arrival, metrics: p.metrics, activities: p.activities,
+        arrival: p.arrival, departure: p.departure, metrics: p.metrics,
+        activities: p.activities, notes: p.notes || {}, highlights: p.highlights || {},
         raw: p.raw, submitted_at: (p.date || '2026-06-24') + 'T17:30:00Z'
       };
     });
@@ -649,10 +779,17 @@
     ACTIVITY_THEMES: ACTIVITY_THEMES,
     ACTIVITY_THEME_INDEX: ACTIVITY_THEME_INDEX,
     metricsForRole: metricsForRole,
+    fullNameOf: fullNameOf,
+    SCORE_WEIGHTS: SCORE_WEIGHTS,
+    ROLE_SCORECARD: ROLE_SCORECARD,
+    SHIFT_START: SHIFT_START,
     categoriseActivity: categoriseActivity,
     parseReport: parseReport,
     saveReport: saveReport,
     loadReports: loadReports,
+    deleteReport: deleteReport,
+    isLocked: isLocked,
+    EDIT_WINDOW_HOURS: EDIT_WINDOW_HOURS,
     seedIfEmpty: seedIfEmpty,
     reseed: reseed,
     DEFAULT_TASKS: DEFAULT_TASKS,

@@ -94,9 +94,26 @@
           <select id="r-shift" class="select"><option>Day</option><option>Night</option></select>
         </div>
       </div>
-      <div class="field" style="max-width:50%"><label>🚶 Time of arrival <span class="hint">(when you arrived — separate from submit time)</span></label><input type="time" id="r-arrival" class="input" /></div>
+      <div class="grid-2">
+        <div class="field"><label>🚶 Time of arrival <span class="hint">(clocked in)</span></label><input type="time" id="r-arrival" class="input" /></div>
+        <div class="field"><label>🏁 Time clocked out <span class="hint">(end of shift)</span></label><input type="time" id="r-departure" class="input" /></div>
+      </div>
       <p class="muted" style="font-size:.8rem; margin:2px 0 0;">🕘 The time you submit is recorded automatically. Reports are due by <strong>9:00 PM</strong> — later submissions are flagged late on the dashboard.</p>
     </div></div>
+
+    <!-- Leadership highlights (top of report) -->
+    <div class="card mb">
+      <div class="card__head"><h2>⭐ Today's highlights</h2><span class="sub">leadership snapshot</span></div>
+      <div class="card__body">
+        <div class="field"><label>🏆 A win for today</label><textarea id="h-win" class="input" rows="2" placeholder="Share a win from today…"></textarea></div>
+        <div class="grid-2">
+          <div class="field"><label>🚧 Blockers experienced</label><textarea id="h-blocker" class="input" rows="2" placeholder="What got in the way…"></textarea></div>
+          <div class="field"><label>🛠️ Suggested close-gap <span class="hint">(or “to be advised”)</span></label><textarea id="h-blocker-action" class="input" rows="2" placeholder="How to close the gap — or 'to be advised'"></textarea></div>
+        </div>
+        <div class="field"><label>🎉 Someone in the team to celebrate</label><input id="h-celebrate" class="input" placeholder="Who, and why…" /></div>
+        <div class="field" style="margin-bottom:0;"><label>⚠️ Something of concern <span class="hint">(see something, say something)</span></label><textarea id="h-concern" class="input" rows="2" placeholder="Raise anything of concern…"></textarea></div>
+      </div>
+    </div>
 
     <div id="metric-cards"></div>
 
@@ -163,7 +180,7 @@ let draft = null; // working report being reviewed
 // ---- init pickers ----
 function fillRoster(sel, selectedName) {
   sel.innerHTML = '<option value="">— select —</option>' +
-    O.ROSTER.map(p => `<option value="${p.name}" ${p.name===selectedName?'selected':''}>${p.name} · ${O.ROLES[p.role].label}</option>`).join('');
+    O.ROSTER.map(p => `<option value="${p.name}" ${p.name===selectedName?'selected':''}>${p.fullName} · ${O.ROLES[p.role].label}</option>`).join('');
 }
 function fillRoles(sel, selectedRole) {
   sel.innerHTML = Object.keys(O.ROLES).map(k =>
@@ -233,7 +250,7 @@ document.getElementById('manual-btn').onclick = () => {
     name: pickedName || '',
     role: rosterRole ? rosterRole.role : pickedRole,
     date: new Date().toISOString().slice(0,10),
-    shift: 'Day', arrival: null, metrics: {}, activities: [], raw: ''
+    shift: 'Day', arrival: null, departure: null, metrics: {}, activities: [], notes: {}, highlights: {}, raw: ''
   };
   renderReview();
   show('review');
@@ -246,6 +263,13 @@ function renderReview() {
   document.getElementById('r-date').value = draft.date || '';
   document.getElementById('r-shift').value = draft.shift || 'Day';
   document.getElementById('r-arrival').value = draft.arrival || '';
+  document.getElementById('r-departure').value = draft.departure || '';
+  const h = draft.highlights || {};
+  document.getElementById('h-win').value = h.win || '';
+  document.getElementById('h-blocker').value = h.blocker || '';
+  document.getElementById('h-blocker-action').value = h.blocker_action || '';
+  document.getElementById('h-celebrate').value = h.celebrate || '';
+  document.getElementById('h-concern').value = h.concern || '';
   renderMetricCards();
   renderActivities();
   renderTaskPicker();
@@ -268,11 +292,15 @@ function renderMetricCards() {
         <div class="stat-grid">
           ${cat.metrics.map(m => `
             <div class="field" style="margin:0;">
-              <label style="font-size:.78rem;">${m.label}</label>
+              <label style="font-size:.78rem;">${m.label}${m.money?' <span class="hint">$</span>':''}</label>
               <input type="number" min="0" class="input m-input" data-key="${m.key}"
                      value="${draft.metrics[m.key] !== undefined && draft.metrics[m.key] !== null ? draft.metrics[m.key] : ''}"
                      placeholder="—" />
             </div>`).join('')}
+        </div>
+        <div class="field" style="margin:12px 0 0;">
+          <label style="font-size:.78rem;">📝 Notes on ${cat.label} <span class="hint">(optional — context, exceptions, anything to flag)</span></label>
+          <textarea class="input note-input" data-cat="${cat.key}" rows="2" placeholder="Add a note for this section…">${((draft.notes||{})[cat.key]||'').replace(/</g,'&lt;')}</textarea>
         </div>
       </div>
     </div>`).join('');
@@ -372,6 +400,7 @@ document.getElementById('submit-btn').onclick = async () => {
   draft.date = document.getElementById('r-date').value;
   draft.shift = document.getElementById('r-shift').value;
   draft.arrival = document.getElementById('r-arrival').value || null;
+  draft.departure = document.getElementById('r-departure').value || null;
   if (!draft.name) { toast('Select who is reporting', true); return; }
   if (!draft.date) { toast('Set the report date', true); return; }
   const metrics = {};
@@ -380,6 +409,13 @@ document.getElementById('submit-btn').onclick = async () => {
   });
   draft.metrics = metrics;
   draft.activities = draft.activities.filter(a => (a.text||'').trim());
+  // per-block notes
+  const notes = {};
+  document.querySelectorAll('.note-input').forEach(t => { if (t.value.trim()) notes[t.dataset.cat] = t.value.trim(); });
+  draft.notes = notes;
+  // leadership highlights
+  const hv = id => (document.getElementById(id).value || '').trim();
+  draft.highlights = { win: hv('h-win'), blocker: hv('h-blocker'), blocker_action: hv('h-blocker-action'), celebrate: hv('h-celebrate'), concern: hv('h-concern') };
 
   const btn = document.getElementById('submit-btn');
   btn.disabled = true; btn.textContent = 'Submitting…';
@@ -422,6 +458,27 @@ function toast(msg, err) {
   t.textContent = msg; t.className = 'toast show' + (err?' toast--err':'');
   setTimeout(() => t.className = 'toast', 2600);
 }
+
+// ---- EDIT MODE: a report handed over from the dashboard (within 48h) ----
+(function initEdit(){
+  const raw = sessionStorage.getItem('ops_edit');
+  if (!raw) return;
+  sessionStorage.removeItem('ops_edit');
+  try {
+    const r = JSON.parse(raw);
+    draft = {
+      name: r.name, role: r.role, date: r.report_date || r.date,
+      shift: r.shift || 'Day', arrival: r.arrival || null, departure: r.departure || null,
+      metrics: r.metrics || {}, activities: r.activities || [],
+      notes: r.notes || {}, highlights: r.highlights || {}, raw: r.raw || ''
+    };
+    renderReview();
+    show('review');
+    document.querySelector('#step-review .eyebrow').textContent = 'Editing · re-submit to update';
+    document.querySelector('#step-review .page-head h1').textContent = 'Edit ' + O.fullNameOf(draft.name) + "'s report";
+    document.getElementById('submit-btn').textContent = 'Save changes ✓';
+  } catch (e) { /* ignore malformed */ }
+})();
 </script>
 </body>
 </html>
