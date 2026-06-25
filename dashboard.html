@@ -105,7 +105,7 @@
       <div class="card__head"><h2>Last 14 days — submission consistency</h2></div>
       <div class="card__body">
         <div id="trk-streak"></div>
-        <div class="legend"><span><i style="background:var(--emerald)"></i>Submitted</span><span><i style="background:#FCA5A5"></i>Missed</span><span><i style="background:var(--bg)"></i>Weekend/future</span></div>
+        <div class="legend"><span><i style="background:var(--emerald)"></i>Submitted</span><span><i style="background:#FCA5A5"></i>Missed (past 9 PM)</span><span><i style="background:var(--bg)"></i>Weekend / still to submit</span></div>
       </div>
     </div>
   </section>
@@ -287,10 +287,13 @@ function renderTracker(){
   const roster = O.ROSTER.filter(p => !role || p.role===role);
   const onDate = ALL.filter(r => r.report_date === date);
 
-  let submitted=0, late=0;
+  // "Missing" only applies once the 9:00 PM cut-off for that day has passed.
+  // Before then, a not-yet-submitted leader is "Still to submit".
+  const deadlinePassed = new Date() > new Date(date + 'T21:00:00');
+  let submitted=0, late=0, missing=0, pending=0;
   const cards = roster.map(p => {
     const rep = onDate.find(r => r.name === p.name);
-    let badge, info;
+    let badge, info, isMiss=false;
     if (rep) {
       submitted++;
       const lateSub = submissionLate(rep);
@@ -300,21 +303,27 @@ function renderTracker(){
         ? `<span class="badge badge--amber">Late${st?' · '+st:''}</span>`
         : `<span class="badge badge--green">On time${st?' · '+st:''}</span>`;
       info = `🕘 Sent ${submittedLabel(rep)} · 🚶 In ${rep.arrival||'—'} · 🏁 Out ${rep.departure||'—'}`;
-    } else {
+    } else if (deadlinePassed) {
+      missing++; isMiss=true;
       badge = `<span class="badge badge--red">Missing</span>`;
-      info = 'No report submitted';
+      info = 'Not submitted by 9:00 PM';
+    } else {
+      pending++;
+      badge = `<span class="badge badge--amber">Still to submit</span>`;
+      info = 'Due by 9:00 PM';
     }
-    return `<div class="status-card ${rep?'':'miss'}">
+    return `<div class="status-card ${isMiss?'miss':''}">
       <span class="avatar" style="background:${avatarColor(p.name)}">${initials(p.fullName)}</span>
       <div class="meta"><div class="nm">${p.fullName}</div><div class="rl">${O.ROLES[p.role].label}</div><div class="rl" style="margin-top:2px;">${info}</div></div>
       <span class="spacer"></span>${badge}</div>`;
   }).join('');
   document.getElementById('trk-grid').innerHTML = cards;
-  const missing = roster.length - submitted;
-  document.getElementById('trk-sub').textContent = `${date} · reports due 9:00 PM`;
+  document.getElementById('trk-sub').textContent = `${date} · reports due 9:00 PM` + (deadlinePassed?'':' · cut-off not yet reached');
   document.getElementById('trk-kpis').innerHTML = `
     ${kpi('Submitted', submitted+'/'+roster.length, 'on this date')}
-    ${kpi('Missing', missing, missing? 'need to report':'all in ✓', missing?'red':'green')}
+    ${deadlinePassed
+        ? kpi('Missing', missing, missing? 'no report by 9 PM':'all in ✓', missing?'red':'green')
+        : kpi('Still to submit', pending, 'due by 9:00 PM', pending?'amber':'green')}
     ${kpi('Late (after 9pm)', late, 'submitted past 21:00', late?'amber':'green')}
     ${kpi('On-time rate', submitted? Math.round((submitted-late)/submitted*100)+'%':'—','of those submitted')}`;
 
@@ -325,9 +334,10 @@ function renderTracker(){
       const dow = new Date(d+'T00:00:00').getDay();
       const weekend = dow===0||dow===6;
       const has = ALL.some(r=>r.name===p.name && r.report_date===d);
-      const future = d > todayISO();
-      let cls = has?'ok':(weekend||future?'future':'miss');
-      return `<span class="dot ${cls}" title="${d}${has?' ✓':''}"></span>`;
+      // a day is only "missed" once its own 9 PM cut-off has passed
+      const cutoffPassed = new Date() > new Date(d+'T21:00:00');
+      let cls = has ? 'ok' : (weekend || !cutoffPassed ? 'future' : 'miss');
+      return `<span class="dot ${cls}" title="${d}${has?' ✓':!cutoffPassed?' · still to submit':' · missed'}"></span>`;
     }).join('');
     return `<div class="row mb" style="gap:14px;">
       <div style="width:150px; font-weight:600; font-size:.85rem;">${p.fullName}</div>
