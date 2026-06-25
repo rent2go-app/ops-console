@@ -387,7 +387,8 @@ function renderProductivity(){
   document.getElementById('prd-kpis').innerHTML = `
     ${kpi('Reports submitted', rows.length, period==='all'?'all time':'this period')}
     ${kpi('On-time rate', rows.length? Math.round((rows.length-lateN)/rows.length*100)+'%':'—', lateN+' late (after 9pm)', lateN?'amber':'green')}
-    ${kpi('Collected', fmtMoney(sumMetric(rows,'dl_amount')), 'period total · informational, not scored', 'green')}
+    ${kpi('💎 Diamond League', fmtMoney(sumMetric(rows,'dl_amount')), 'collected · running total', 'green')}
+    ${kpi('🛒 Gen Pop & Sales', fmtMoney(sumMetric(rows,'gp_amount')), 'collected · running total', 'green')}
     ${kpi('Tickets resolved', sumMetric(rows,'tickets_resolved'), 'team total')}
     ${kpi('Payments captured', sumMetric(rows,'payments_captured'), 'team total')}
     ${kpi('Calls handled', callsOf(rows), 'inbound + outbound')}`;

@@ -61,7 +61,7 @@
       roles: ['core-ops', 'cash-ops', 'governance'],
       metrics: [
         { key: 'paid_clients', label: 'Paid Clients',  aliases: ['paid clients'] },
-        { key: 'dl_amount',    label: 'Amount Collected ($)', money: true, aliases: ['amount collected', 'total collected', 'collections amount', 'amount in', 'amount came in', 'revenue collected', 'amount banked', 'value collected'] },
+        { key: 'dl_amount',    label: 'Diamond League Collected ($)', money: true, aliases: ['diamond league collected', 'diamond league collections', 'diamond collected', 'diamond collections', 'dl collected', 'amount collected', 'value collected'] },
         { key: 'dl_emails',    label: 'Emails Sent',   aliases: ['emails sent', 'emails'] },
         { key: 'dl_calls',     label: 'Calls / Contacts Made', aliases: ['calls made', 'contacts made', 'calls'] }
       ]
@@ -101,6 +101,7 @@
       headers: ['billing operations', 'billing'],
       roles: ['core-ops', 'cash-ops', 'governance'],
       metrics: [
+        { key: 'gp_amount',          label: 'Gen Pop & Sales Collected ($)', money: true, aliases: ['gen pop & sales collected', 'gen pop and sales', 'gen pop collected', 'gen pop collections', 'genpop collected', 'general collections', 'sales collected', 'gen pop'] },
         { key: 'payments_captured',  label: 'Payments Captured',  aliases: ['payments captured'] },
         { key: 'payments_confirmed', label: 'Payments Confirmed (Bank)', aliases: ['payments confirmed on bank statement', 'payments confirmed'] },
         { key: 'account_recons',     label: 'Account Reconciliations', aliases: ['account reconciliations', 'accountreconciliations', 'june account reconciliations', 'churn recons', 'reconciliations'] },
