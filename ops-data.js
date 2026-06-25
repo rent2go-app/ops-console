@@ -170,9 +170,11 @@
         { label: 'QA done',          keys: ['qa_evaluations', 'credit_notes'], target: 5 },
         { label: 'Resolution rate',  ratioNum: ['tickets_resolved'], ratioDen: ['tickets_resolved', 'tickets_escalated'], target: 0.60 }
       ],
+      // Value = collection ACTIVITY & DISCIPLINE (not the lumpy $ amount).
       value: [
-        { label: 'Amount collected', keys: ['dl_amount'], target: 300, money: true },
-        { label: 'Paid clients',     keys: ['paid_clients'], target: 1 }
+        { label: 'Paid clients',                       keys: ['paid_clients'], target: 1 },
+        { label: 'Collection follow-ups',              keys: ['follow_ups'], target: 5 },
+        { label: 'Disconnections / Chidzoka actioned', keys: ['disconnections', 'chidzoka'], target: 3 }
       ]
     },
     'cash-ops': {
@@ -186,9 +188,10 @@
         { label: 'Reconciliations',     keys: ['account_recons'], target: 15 },
         { label: 'Internal customers',  keys: ['internal_customers'], target: 3 }
       ],
+      // Value = collection/retention discipline (counts of actions, not $).
       value: [
-        { label: 'Cash disbursed',   keys: ['cash_disbursed'], target: 4 },
-        { label: 'Amount collected', keys: ['dl_amount'], target: 250, money: true }
+        { label: 'Cash payments disbursed', keys: ['cash_disbursed'], target: 4 },
+        { label: 'Paid clients',            keys: ['paid_clients'], target: 1 }
       ]
     },
     'network-ops': {
@@ -216,10 +219,9 @@
         { label: 'Resolution rate', ratioNum: ['tickets_resolved'], ratioDen: ['tickets_resolved', 'tickets_escalated'], target: 0.60 },
         { label: 'QA coverage',     keys: ['qa_evaluations', 'credit_notes'], target: 6 }
       ],
-      value: [
-        { label: 'Payments captured', keys: ['payments_captured'], target: 2 },
-        { label: 'Amount collected',  keys: ['dl_amount'], target: 200, money: true }
-      ]
+      // Governance is a compliance role — no revenue Value pillar; the score
+      // re-weights across Throughput, Quality and Timeliness.
+      value: []
     }
   };
 

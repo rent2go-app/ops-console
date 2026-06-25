@@ -150,8 +150,16 @@
     </div>
 
     <div class="card mb">
-      <div class="card__head"><h2>👥 Leader scorecards</h2><span class="sub">productivity score per person · tap to see targets</span></div>
-      <div class="card__body"><div class="scards" id="prd-scorecards"></div></div>
+      <div class="card__head"><h2>👥 Leader scorecards</h2><span class="sub">each leader's own score · tap to see targets</span></div>
+      <div class="card__body">
+        <div class="muted" style="font-size:.78rem; margin-bottom:14px; display:flex; gap:8px 18px; flex-wrap:wrap;">
+          <span><strong>⚙️ Throughput</strong> — volume of work done (40%)</span>
+          <span><strong>✅ Quality</strong> — QA + resolution rate (25%)</span>
+          <span><strong>🕘 Timeliness</strong> — on-time by 9 PM &amp; consistent (20%)</span>
+          <span><strong>💰 Value</strong> — collection activity &amp; discipline (15%)</span>
+        </div>
+        <div class="scards" id="prd-scorecards"></div>
+      </div>
     </div>
   </section>
 
@@ -369,7 +377,7 @@ function renderProductivity(){
   document.getElementById('prd-kpis').innerHTML = `
     ${kpi('Reports submitted', rows.length, period==='all'?'all time':'this period')}
     ${kpi('On-time rate', rows.length? Math.round((rows.length-lateN)/rows.length*100)+'%':'—', lateN+' late (after 9pm)', lateN?'amber':'green')}
-    ${kpi('Collected', fmtMoney(sumMetric(rows,'dl_amount')), 'Diamond League revenue', 'green')}
+    ${kpi('Collected', fmtMoney(sumMetric(rows,'dl_amount')), 'period total · informational, not scored', 'green')}
     ${kpi('Tickets resolved', sumMetric(rows,'tickets_resolved'), 'team total')}
     ${kpi('Payments captured', sumMetric(rows,'payments_captured'), 'team total')}
     ${kpi('Calls handled', callsOf(rows), 'inbound + outbound')}`;
@@ -380,7 +388,6 @@ function renderProductivity(){
   const dates = Object.keys(byDate).sort().reverse();
   const dCols = [
     {lab:'Reports',    f:rr=>rr.length},
-    {lab:'Collected',  f:rr=>sumMetric(rr,'dl_amount'), money:true},
     {lab:'Paid',       f:rr=>sumMetric(rr,'paid_clients')},
     {lab:'Tkts resolved', f:rr=>sumMetric(rr,'tickets_resolved')},
     {lab:'Tkts closed',   f:rr=>sumMetric(rr,'tickets_closed')},
@@ -489,14 +496,15 @@ function renderTeamHealth(rows, roster, expectedDays){
   const onTimeRate=reports? rows.filter(r=>!submissionLate(r)).length/reports:0;
   const resolved=metricSum(rows,['tickets_resolved']), escalated=metricSum(rows,['tickets_escalated']);
   const resolution=(resolved+escalated)? resolved/(resolved+escalated):null;
-  let expCollect=0; roster.forEach(p=>{ ((O.ROLE_SCORECARD[p.role]||{}).value||[]).forEach(d=>{ if(d.money) expCollect+=d.target*(expectedDays||1); }); });
-  const collected=metricSum(rows,['dl_amount']);
-  const valueDelivery=expCollect? Math.min(1, collected/expCollect):(collected?1:0);
+  // Collections discipline = average of leaders' Value-pillar attainment
+  // (activity & discipline, NOT $ collected).
+  let vScores=[]; roster.forEach(p=>{ const rr=rows.filter(r=>r.name===p.name); if(!rr.length) return; const vd=(O.ROLE_SCORECARD[p.role]||{}).value; if(vd&&vd.length) vScores.push(pillarDetail(rr,vd).score); });
+  const collDiscipline = vScores.length? (vScores.reduce((a,b)=>a+b,0)/vScores.length)/100 : null;
   const comps=[
     {label:'Submission rate', w:0.25, pct:submissionRate, detail:reports+(expected?' / '+expected:'')+' reports'},
     {label:'On-time (by 9 PM)', w:0.20, pct:onTimeRate, detail:Math.round(onTimeRate*100)+'%'},
     {label:'Resolution effectiveness', w:0.30, pct:resolution===null?0:resolution, detail:resolution===null?'n/a':Math.round(resolution*100)+'%', na:resolution===null},
-    {label:'Value delivery', w:0.25, pct:valueDelivery, detail:fmtMoney(collected)+(expCollect?' / '+fmtMoney(expCollect):'')}
+    {label:'Collections discipline', w:0.25, pct:collDiscipline===null?0:collDiscipline, detail:collDiscipline===null?'n/a':Math.round(collDiscipline*100)+'%', na:collDiscipline===null}
   ];
   const active=comps.filter(c=>!c.na), wsum=active.reduce((s,c)=>s+c.w,0)||1;
   const score=reports? Math.round(active.reduce((s,c)=>s+c.pct*c.w,0)/wsum*100):0;
