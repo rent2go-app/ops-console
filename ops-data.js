@@ -51,6 +51,7 @@
       roles: ['core-ops', 'cash-ops'],
       metrics: [
         { key: 'paid_clients', label: 'Paid Clients',  aliases: ['paid clients'] },
+        { key: 'dl_amount',    label: 'Amount Collected ($)', money: true, aliases: ['amount collected', 'total collected', 'collections amount', 'amount in', 'amount came in', 'revenue collected', 'amount banked', 'value collected'] },
         { key: 'dl_emails',    label: 'Emails Sent',   aliases: ['emails sent', 'emails'] },
         { key: 'dl_calls',     label: 'Calls / Contacts Made', aliases: ['calls made', 'contacts made', 'calls'] }
       ]

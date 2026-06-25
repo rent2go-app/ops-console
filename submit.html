@@ -65,7 +65,7 @@
         <textarea id="paste" class="input" rows="11" placeholder="📋 End of Day Report&#10;💎 DIAMOND LEAGUE&#10;• Paid Clients: 2&#10;• Calls Made: 4&#10;..."></textarea>
       </div>
       <div class="row row--wrap">
-        <button class="btn btn--primary btn--lg" id="parse-btn">Review captured report →</button>
+        <button class="btn btn--primary btn--lg" id="parse-btn">Review &amp; submit →</button>
         <button class="btn btn--dark btn--lg" id="manual-btn" type="button">Build from task list →</button>
         <button class="btn btn--ghost" id="sample-btn" type="button">Load a sample</button>
         <span class="spacer"></span>
@@ -94,7 +94,8 @@
           <select id="r-shift" class="select"><option>Day</option><option>Night</option></select>
         </div>
       </div>
-      <div class="field" style="max-width:50%"><label>Time of arrival <span class="hint">(punctuality)</span></label><input type="time" id="r-arrival" class="input" /></div>
+      <div class="field" style="max-width:50%"><label>🚶 Time of arrival <span class="hint">(when you arrived — separate from submit time)</span></label><input type="time" id="r-arrival" class="input" /></div>
+      <p class="muted" style="font-size:.8rem; margin:2px 0 0;">🕘 The time you submit is recorded automatically. Reports are due by <strong>9:00 PM</strong> — later submissions are flagged late on the dashboard.</p>
     </div></div>
 
     <div id="metric-cards"></div>
@@ -385,9 +386,18 @@ document.getElementById('submit-btn').onclick = async () => {
   const res = await O.saveReport(draft);
   btn.disabled = false; btn.textContent = 'Submit report ✓';
   if (res.ok) {
-    document.getElementById('done-msg').textContent =
-      `${draft.name}'s report for ${draft.date} is saved` +
-      (res.via === 'supabase' ? ' to the shared database.' : ' (local demo mode).');
+    // stamp + show submission time, and whether it beat the 9:00 PM cut-off
+    const now = new Date();
+    const hhmm = String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
+    const due = new Date(draft.date + 'T21:00:00');
+    const onTime = now <= due;
+    document.getElementById('done-msg').innerHTML =
+      `${draft.name}'s report for <strong>${draft.date}</strong> is saved` +
+      (res.via === 'supabase' ? ' to the shared database.' : ' (local demo mode).') +
+      `<br><span style="font-size:.92em;">🕘 Submitted at <strong>${hhmm}</strong> — ` +
+      (onTime ? '<span style="color:var(--emerald);font-weight:700;">on time</span>'
+              : '<span style="color:var(--amber);font-weight:700;">late</span> (after the 9:00 PM cut-off)') +
+      `</span>`;
     show('done');
   } else {
     toast('Could not save — try again', true);

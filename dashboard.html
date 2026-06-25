@@ -112,23 +112,25 @@
       <select id="prd-role" class="select"><option value="">All roles</option></select>
     </div>
 
+    <div class="eyebrow" id="prd-range-lab" style="margin-bottom:10px;"></div>
     <div class="stat-grid mb" id="prd-kpis"></div>
 
     <div class="card mb">
-      <div class="card__head"><h2>🏆 Productivity leaderboard</h2><span class="sub" id="prd-range-lab"></span></div>
+      <div class="card__head"><h2>📆 Daily team outputs</h2><span class="sub">what was delivered each day</span></div>
       <div class="card__body" style="overflow-x:auto;">
-        <table class="tbl" id="prd-table"></table>
+        <table class="tbl" id="prd-daily"></table>
       </div>
     </div>
 
-    <div class="grid-2">
-      <div class="card">
-        <div class="card__head"><h2>📈 Outcomes by category</h2></div>
-        <div class="card__body" id="prd-outcomes"></div>
-      </div>
-      <div class="card">
-        <div class="card__head"><h2>🗂️ Activity mix</h2></div>
-        <div class="card__body" id="prd-themes"></div>
+    <div class="card mb">
+      <div class="card__head"><h2>📈 Outcomes by category</h2><span class="sub">team total for the period</span></div>
+      <div class="card__body" id="prd-outcomes"></div>
+    </div>
+
+    <div class="card mb">
+      <div class="card__head"><h2>👥 Individual outputs</h2><span class="sub">per person · not a ranking</span></div>
+      <div class="card__body" style="overflow-x:auto;">
+        <table class="tbl" id="prd-individual"></table>
       </div>
     </div>
   </section>
@@ -172,12 +174,32 @@ function addDays(iso,d){ const x=new Date(iso+'T00:00:00'); x.setDate(x.getDate(
 
 // metric value sum across a set of reports
 function sumMetric(rows, key){ return rows.reduce((s,r)=> s + (typeof (r.metrics||{})[key]==='number'? r.metrics[key]:0), 0); }
-function totalOutput(r){
+// "Work done" = the real outputs only (sum of metric values). Activities/items
+// are NOT counted toward productivity.
+function workDone(r){
   let s = 0; const m = r.metrics||{};
   for (const k in m) if (typeof m[k]==='number') s += m[k];
-  return s + (r.activities? r.activities.length:0);
+  return s;
 }
-function arrivalLate(r){ return r.arrival && r.arrival > '08:00'; }
+// Reports are due by 9:00 PM of the report's day. Submission lateness is based
+// on submitted_at (the timestamp the report was submitted) — separate from the
+// leader's time of arrival (which is an informational reporting field).
+const DUE_HOUR = 21;
+function subDate(r){ return r.submitted_at ? new Date(r.submitted_at) : null; }
+function subTimeStr(r){ const d=subDate(r); if(!d||isNaN(d)) return null; return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); }
+function submissionLate(r){
+  const d = subDate(r); if (!d || isNaN(d) || !r.report_date) return false;
+  const due = new Date(r.report_date + 'T21:00:00');   // 9:00 PM local on report day
+  return d > due;
+}
+// Readable submitted timestamp: "19:32", or "25 Jun 02:14" if submitted on a
+// different day than the report date.
+function submittedLabel(r){
+  const d = subDate(r); if (!d || isNaN(d)) return '—';
+  const t = subTimeStr(r);
+  const sameDay = r.report_date && d.toISOString().slice(0,10) === r.report_date;
+  return sameDay ? t : d.toLocaleDateString(undefined,{day:'2-digit',month:'short'}) + ' ' + t;
+}
 
 async function boot(){
   O.seedIfEmpty();
@@ -195,7 +217,7 @@ async function boot(){
     O.ROSTER.map(p=>`<option value="${p.name}">${p.name}</option>`).join('');
   // metric picker (history)
   document.getElementById('hist-metric').innerHTML =
-    '<option value="__output">Total output (all numbers + activities)</option>' +
+    '<option value="__output">Work done (all output metrics)</option>' +
     O.CATEGORIES.map(c=>`<optgroup label="${c.label}">`+
       c.metrics.map(m=>`<option value="${m.key}">${m.label}</option>`).join('')+'</optgroup>').join('');
 
@@ -240,24 +262,33 @@ function renderTracker(){
   let submitted=0, late=0;
   const cards = roster.map(p => {
     const rep = onDate.find(r => r.name === p.name);
-    if (rep) { submitted++; if (arrivalLate(rep)) late++; }
-    const lateBadge = rep ? (arrivalLate(rep)
-        ? `<span class="badge badge--amber">Late ${rep.arrival}</span>`
-        : (rep.arrival? `<span class="badge badge--green">On time ${rep.arrival}</span>` : `<span class="badge badge--green">Submitted</span>`))
-      : `<span class="badge badge--red">Missing</span>`;
+    let badge, info;
+    if (rep) {
+      submitted++;
+      const lateSub = submissionLate(rep);
+      if (lateSub) late++;
+      const st = subTimeStr(rep);
+      badge = lateSub
+        ? `<span class="badge badge--amber">Late${st?' · '+st:''}</span>`
+        : `<span class="badge badge--green">On time${st?' · '+st:''}</span>`;
+      info = `🕘 Submitted ${submittedLabel(rep)}  ·  🚶 Arrived ${rep.arrival||'—'}`;
+    } else {
+      badge = `<span class="badge badge--red">Missing</span>`;
+      info = 'No report submitted';
+    }
     return `<div class="status-card ${rep?'':'miss'}">
       <span class="avatar" style="background:${avatarColor(p.name)}">${initials(p.name)}</span>
-      <div class="meta"><div class="nm">${p.name}</div><div class="rl">${O.ROLES[p.role].label}</div></div>
-      <span class="spacer"></span>${lateBadge}</div>`;
+      <div class="meta"><div class="nm">${p.name}</div><div class="rl">${O.ROLES[p.role].label}</div><div class="rl" style="margin-top:2px;">${info}</div></div>
+      <span class="spacer"></span>${badge}</div>`;
   }).join('');
   document.getElementById('trk-grid').innerHTML = cards;
   const missing = roster.length - submitted;
-  document.getElementById('trk-sub').textContent = `${date}`;
+  document.getElementById('trk-sub').textContent = `${date} · reports due 9:00 PM`;
   document.getElementById('trk-kpis').innerHTML = `
     ${kpi('Submitted', submitted+'/'+roster.length, 'on this date')}
     ${kpi('Missing', missing, missing? 'need to report':'all in ✓', missing?'red':'green')}
-    ${kpi('Late arrivals', late, 'after 08:00', late?'amber':'green')}
-    ${kpi('Submission rate', roster.length? Math.round(submitted/roster.length*100)+'%':'—','for the day')}`;
+    ${kpi('Late (after 9pm)', late, 'submitted past 21:00', late?'amber':'green')}
+    ${kpi('On-time rate', submitted? Math.round((submitted-late)/submitted*100)+'%':'—','of those submitted')}`;
 
   // last 14 days streak grid
   const days = []; for (let i=13;i>=0;i--) days.push(addDays(date,-i));
@@ -297,71 +328,83 @@ function periodRange(){
   if (period==='custom') return [document.getElementById('prd-from').value||'0000-01-01', document.getElementById('prd-to').value||'9999-12-31'];
   return ['0000-01-01','9999-12-31'];
 }
-let sortKey='output', sortDir=-1;
+// is a metric a money/$ value? (kept out of count-based totals)
+function isMoney(key){ return !!(O.METRIC_INDEX[key] && O.METRIC_INDEX[key].metric.money); }
+function fmtMoney(n){ return '$' + (n||0).toLocaleString(); }
+// composite output helpers shared by the daily + individual tables
+function callsOf(rr){ return sumMetric(rr,'inbound_calls')+sumMetric(rr,'outbound_calls')+sumMetric(rr,'dl_calls'); }
+function qaOf(rr){ return sumMetric(rr,'qa_evaluations')+sumMetric(rr,'credit_notes'); }
+function reconsOf(rr){ return sumMetric(rr,'account_recons')+sumMetric(rr,'recons'); }
+
 function renderProductivity(){
   const [from,to] = periodRange();
   const role = document.getElementById('prd-role').value;
   const rows = ALL.filter(r => r.report_date>=from && r.report_date<=to && (!role||r.role===role));
   const roster = O.ROSTER.filter(p=>!role||p.role===role);
-  document.getElementById('prd-range-lab').textContent = (period==='all'?'all time':`${from} → ${to}`);
+  document.getElementById('prd-range-lab').textContent =
+    (period==='all'?'All time':`${from} → ${to}`) + (role? ' · '+O.ROLES[role].label : ' · whole team');
 
-  // headline KPIs
-  const workdays = countWorkdays(from==='0000-01-01'? minDate(rows):from, to>todayISO()?todayISO():to);
-  const expected = roster.length * workdays;
+  // ---- TEAM consolidated outputs (real work done, not activity counts) ----
+  const lateN = rows.filter(submissionLate).length;
   document.getElementById('prd-kpis').innerHTML = `
-    ${kpi('Reports submitted', rows.length, expected?`of ~${expected} expected`:'')}
-    ${kpi('Submission rate', expected? Math.round(rows.length/expected*100)+'%':'—','reports ÷ expected')}
-    ${kpi('Tickets resolved', sumMetric(rows,'tickets_resolved'), 'period total')}
-    ${kpi('Payments captured', sumMetric(rows,'payments_captured'), 'period total')}
-    ${kpi('Paid clients', sumMetric(rows,'paid_clients'), 'Diamond League')}
-    ${kpi('QA evaluations', sumMetric(rows,'qa_evaluations')+sumMetric(rows,'credit_notes'), 'quality checks')}`;
+    ${kpi('Reports submitted', rows.length, period==='all'?'all time':'this period')}
+    ${kpi('On-time rate', rows.length? Math.round((rows.length-lateN)/rows.length*100)+'%':'—', lateN+' late (after 9pm)', lateN?'amber':'green')}
+    ${kpi('Collected', fmtMoney(sumMetric(rows,'dl_amount')), 'Diamond League revenue', 'green')}
+    ${kpi('Tickets resolved', sumMetric(rows,'tickets_resolved'), 'team total')}
+    ${kpi('Payments captured', sumMetric(rows,'payments_captured'), 'team total')}
+    ${kpi('Calls handled', callsOf(rows), 'inbound + outbound')}`;
 
-  // leaderboard
-  const perPerson = roster.map(p => {
-    const rr = rows.filter(r=>r.name===p.name);
-    const out = rr.reduce((s,r)=>s+totalOutput(r),0);
-    const lateN = rr.filter(arrivalLate).length;
-    return {
-      name:p.name, role:p.role, reports:rr.length, output:out,
-      onTimePct: rr.length? Math.round((rr.length-lateN)/rr.length*100):null,
-      tickets: sumMetric(rr,'tickets_resolved')+sumMetric(rr,'tickets_closed')+sumMetric(rr,'tickets_updated'),
-      calls: sumMetric(rr,'inbound_calls')+sumMetric(rr,'outbound_calls')+sumMetric(rr,'dl_calls'),
-      payments: sumMetric(rr,'payments_captured'),
-      paid: sumMetric(rr,'paid_clients')
-    };
-  });
-  perPerson.sort((a,b)=> (b[sortKey]??-1) > (a[sortKey]??-1) ? -sortDir : (b[sortKey]??-1) < (a[sortKey]??-1)? sortDir : 0);
-  const cols = [['name','Leader'],['reports','Reports'],['output','Total output'],['onTimePct','On-time %'],['tickets','Tickets'],['calls','Calls'],['payments','Payments'],['paid','Paid clients']];
-  const maxOut = Math.max(1,...perPerson.map(x=>x.output));
-  document.getElementById('prd-table').innerHTML =
-    `<thead><tr>${cols.map(c=>`<th class="sortable ${c[0]!=='name'?'num':''}" data-k="${c[0]}">${c[1]}${sortKey===c[0]?(sortDir<0?' ↓':' ↑'):''}</th>`).join('')}</tr></thead>
-     <tbody>${perPerson.map((x,i)=>`<tr>
-        <td class="name"><div class="row"><span class="avatar" style="width:28px;height:28px;font-size:.72rem;background:${avatarColor(x.name)}">${initials(x.name)}</span>${x.name}</div></td>
-        <td class="num">${x.reports}</td>
-        <td class="num"><div class="row" style="justify-content:flex-end;gap:8px;"><div class="bar-track" style="width:70px;"><div class="bar-fill" style="width:${x.output/maxOut*100}%"></div></div>${x.output}</div></td>
-        <td class="num">${x.onTimePct===null?'—':x.onTimePct+'%'}</td>
-        <td class="num">${x.tickets}</td><td class="num">${x.calls}</td>
-        <td class="num">${x.payments}</td><td class="num">${x.paid}</td></tr>`).join('')}</tbody>`;
-  document.querySelectorAll('#prd-table .sortable').forEach(th => th.onclick = () => {
-    const k = th.dataset.k; if (k===sortKey) sortDir=-sortDir; else {sortKey=k; sortDir=-1;} renderProductivity();
-  });
+  // ---- DAILY team outputs ----
+  const byDate = {};
+  rows.forEach(r=>{ (byDate[r.report_date]=byDate[r.report_date]||[]).push(r); });
+  const dates = Object.keys(byDate).sort().reverse();
+  const dCols = [
+    {lab:'Reports',    f:rr=>rr.length},
+    {lab:'Collected',  f:rr=>sumMetric(rr,'dl_amount'), money:true},
+    {lab:'Paid',       f:rr=>sumMetric(rr,'paid_clients')},
+    {lab:'Tkts resolved', f:rr=>sumMetric(rr,'tickets_resolved')},
+    {lab:'Tkts closed',   f:rr=>sumMetric(rr,'tickets_closed')},
+    {lab:'Payments',   f:rr=>sumMetric(rr,'payments_captured')},
+    {lab:'Calls',      f:rr=>callsOf(rr)},
+    {lab:'QA',         f:rr=>qaOf(rr)},
+    {lab:'Recons',     f:rr=>reconsOf(rr)},
+  ];
+  const cell = (c,rr)=>{ const v=c.f(rr); return c.money? (v?fmtMoney(v):'') : (v||''); };
+  document.getElementById('prd-daily').innerHTML =
+    `<thead><tr><th>Date</th>${dCols.map(c=>`<th class="num">${c.lab}</th>`).join('')}</tr></thead>
+     <tbody>${dates.map(d=>`<tr><td class="name">${d}</td>${dCols.map(c=>`<td class="num">${cell(c,byDate[d])}</td>`).join('')}</tr>`).join('')
+       || `<tr><td colspan="${dCols.length+1}"><p class="empty">No reports in this period.</p></td></tr>`}
+       ${dates.length? `<tr style="font-weight:800;border-top:2px solid var(--border-2);background:var(--bg);"><td>Team total</td>${dCols.map(c=>`<td class="num">${c.money?fmtMoney(c.f(rows)):c.f(rows)}</td>`).join('')}</tr>`:''}
+     </tbody>`;
 
-  // outcomes by category
+  // ---- outcomes by category (count-based; money metrics excluded) ----
   const catTotals = O.CATEGORIES.map(c => ({
     label:c.label, icon:c.icon,
-    total: c.metrics.reduce((s,m)=>s+sumMetric(rows,m.key),0)
+    total: c.metrics.reduce((s,m)=> s + (m.money?0:sumMetric(rows,m.key)), 0)
   })).filter(c=>c.total>0).sort((a,b)=>b.total-a.total);
   const maxCat = Math.max(1,...catTotals.map(c=>c.total));
   document.getElementById('prd-outcomes').innerHTML = catTotals.length? catTotals.map(c=>bar(c.icon+' '+c.label, c.total, maxCat)).join('')
     : '<p class="empty">No metric data in this period.</p>';
 
-  // activity themes
-  const themeCount = {};
-  rows.forEach(r => (r.activities||[]).forEach(a => themeCount[a.theme]=(themeCount[a.theme]||0)+1));
-  const themes = Object.keys(themeCount).map(k=>({k, label:(O.ACTIVITY_THEME_INDEX[k]||{label:k}).label, icon:(O.ACTIVITY_THEME_INDEX[k]||{icon:'📌'}).icon, n:themeCount[k]})).sort((a,b)=>b.n-a.n);
-  const maxTh = Math.max(1,...themes.map(t=>t.n));
-  document.getElementById('prd-themes').innerHTML = themes.length? themes.map(t=>bar(t.icon+' '+t.label, t.n, maxTh)).join('')
-    : '<p class="empty">No activities logged in this period.</p>';
+  // ---- INDIVIDUAL outputs (per person, roster order — NOT ranked) ----
+  const iCols = [
+    {lab:'Reports', f:rr=>rr.length},
+    {lab:'On-time', f:rr=>rr.length? Math.round((rr.length-rr.filter(submissionLate).length)/rr.length*100)+'%':'—'},
+    {lab:'Collected', f:rr=>sumMetric(rr,'dl_amount'), money:true},
+    {lab:'Paid', f:rr=>sumMetric(rr,'paid_clients')},
+    {lab:'Tkts resolved', f:rr=>sumMetric(rr,'tickets_resolved')},
+    {lab:'Payments', f:rr=>sumMetric(rr,'payments_captured')},
+    {lab:'Calls', f:rr=>callsOf(rr)},
+    {lab:'QA', f:rr=>qaOf(rr)},
+  ];
+  document.getElementById('prd-individual').innerHTML =
+    `<thead><tr><th>Leader</th><th>Role</th>${iCols.map(c=>`<th class="num">${c.lab}</th>`).join('')}</tr></thead>
+     <tbody>${roster.map(p=>{ const rr=rows.filter(r=>r.name===p.name);
+        return `<tr>
+          <td class="name"><div class="row"><span class="avatar" style="width:26px;height:26px;font-size:.68rem;background:${avatarColor(p.name)}">${initials(p.name)}</span>${p.name}</div></td>
+          <td class="muted" style="font-size:.8rem;">${O.ROLES[p.role].label}</td>
+          ${iCols.map(c=>`<td class="num" ${rr.length?'':'style=\"opacity:.4\"'}>${c.money?(c.f(rr)?fmtMoney(c.f(rr)):'—'):c.f(rr)}</td>`).join('')}</tr>`;
+     }).join('')}</tbody>`;
 }
 function countWorkdays(from,to){
   if (!from||from==='0000-01-01'||to==='9999-12-31') return 0;
@@ -378,18 +421,17 @@ function renderHistory(){
   const rows = ALL.filter(r=>r.name===name).sort((a,b)=>a.report_date<b.report_date?-1:1);
   document.getElementById('hist-count').textContent = rows.length+' report'+(rows.length===1?'':'s')+' on record';
 
-  const val = r => metric==='__output'? totalOutput(r) : (typeof r.metrics[metric]==='number'? r.metrics[metric]:0);
-  const metricLabel = metric==='__output'?'Total output' : (O.METRIC_INDEX[metric]? O.METRIC_INDEX[metric].metric.label : metric);
+  const val = r => metric==='__output'? workDone(r) : (typeof r.metrics[metric]==='number'? r.metrics[metric]:0);
+  const metricLabel = metric==='__output'?'Work done' : (O.METRIC_INDEX[metric]? O.METRIC_INDEX[metric].metric.label : metric);
 
   // KPIs
   const total = rows.reduce((s,r)=>s+val(r),0);
-  const lateN = rows.filter(arrivalLate).length;
-  const months = new Set(rows.map(r=>O.monthKey(r.report_date)));
+  const lateN = rows.filter(submissionLate).length;
   document.getElementById('hist-kpis').innerHTML = `
     ${kpi('Reports', rows.length, 'all time')}
     ${kpi(metricLabel+' total', total, 'across all reports')}
     ${kpi('Avg / report', rows.length? (total/rows.length).toFixed(1):'0', metricLabel.toLowerCase())}
-    ${kpi('On-time rate', rows.length? Math.round((rows.length-lateN)/rows.length*100)+'%':'—', lateN+' late')}`;
+    ${kpi('On-time rate', rows.length? Math.round((rows.length-lateN)/rows.length*100)+'%':'—', lateN+' late (after 9pm)', lateN?'amber':'green')}`;
 
   // trend sparkline
   document.getElementById('hist-trend-lab').textContent = metricLabel+' trend';
@@ -418,12 +460,14 @@ function renderHistory(){
       const th = O.ACTIVITY_THEME_INDEX[a.theme]||{icon:'📌',label:'Other'};
       return `<div style="padding:5px 0; font-size:.86rem;"><span class="theme-chip">${th.icon} ${th.label}</span> ${escapeHtml(a.text)}</div>`;
     }).join('') || '<p class="muted" style="font-size:.84rem;">No activities.</p>';
+    const lateSub = submissionLate(r);
     return `<div class="rep-item" data-i="${idx}">
       <div class="rep-head">
         <span class="avatar" style="width:30px;height:30px;font-size:.74rem;background:${avatarColor(name)}">${initials(name)}</span>
-        <div><div style="font-weight:700;">${r.report_date}</div><div class="muted" style="font-size:.76rem;">${r.shift||'Day'} shift${r.arrival?' · arrived '+r.arrival:''}${arrivalLate(r)?' · <span style="color:var(--amber);font-weight:700;">late</span>':''}</div></div>
+        <div><div style="font-weight:700;">${r.report_date}</div><div class="muted" style="font-size:.76rem;">${r.shift||'Day'} shift · 🕘 submitted ${submittedLabel(r)} · 🚶 arrived ${r.arrival||'—'}${lateSub?' · <span style="color:var(--amber);font-weight:700;">late</span>':''}</div></div>
         <span class="spacer"></span>
-        <span class="badge badge--blue">Output ${totalOutput(r)}</span>
+        <span class="badge ${lateSub?'badge--amber':'badge--green'}">${lateSub?'Late':'On time'}</span>
+        <span class="badge badge--blue">Work done ${workDone(r)}</span>
         <span class="muted" style="font-size:1.1rem;">⌄</span>
       </div>
       <div class="rep-body">
