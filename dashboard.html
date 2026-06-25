@@ -245,7 +245,7 @@ async function boot(){
     O.ROSTER.map(p=>`<option value="${p.name}">${p.fullName}</option>`).join('');
   // metric picker (history)
   document.getElementById('hist-metric').innerHTML =
-    '<option value="__output">Work done (all output metrics)</option>' +
+    '<option value="__score">Productivity score</option>' +
     O.CATEGORIES.map(c=>`<optgroup label="${c.label}">`+
       c.metrics.map(m=>`<option value="${m.key}">${m.label}</option>`).join('')+'</optgroup>').join('');
 
@@ -480,9 +480,9 @@ function pillarDetail(rows, defs){
       // ratio is n/a (not penalised) when there's nothing to rate
       return {label:d.label, pct: applicable? Math.min(1, rate/d.target):null, display: applicable? (Math.round(rate*100)+'% / '+Math.round(d.target*100)+'%') : 'n/a'};
     }
-    // Only count days the metric was actually REPORTED — a blank field is n/a,
-    // never a 0 that drags the score down. (An explicit 0 still counts.)
-    const appliedDays = rows.filter(r => d.keys.some(k => typeof (r.metrics||{})[k]==='number')).length;
+    // Only POSITIVE reported values count. A blank OR an explicit 0 is n/a and
+    // never drags the score down — only actual activity (> 0) is scored.
+    const appliedDays = rows.filter(r => d.keys.some(k => typeof (r.metrics||{})[k]==='number' && (r.metrics[k]>0))).length;
     if (appliedDays===0) return {label:d.label, pct:null, display:'n/a'};
     const actual=metricSum(rows,d.keys), tgt=d.target*appliedDays;
     return {label:d.label, pct:Math.min(1, actual/tgt), display:(d.money?fmtMoney(actual):actual)+' / '+(d.money?fmtMoney(tgt):tgt)};
@@ -564,39 +564,50 @@ document.getElementById('hist-person').onchange = renderHistory;
 document.getElementById('hist-metric').onchange = renderHistory;
 function renderHistory(){
   const name = document.getElementById('hist-person').value || O.ROSTER[0].name;
-  const metric = document.getElementById('hist-metric').value || '__output';
+  const metric = document.getElementById('hist-metric').value || '__score';
+  const role = (O.ROSTER.find(p=>p.name===name)||{}).role || 'core-ops';
   const rows = ALL.filter(r=>r.name===name).sort((a,b)=>a.report_date<b.report_date?-1:1);
   document.getElementById('hist-count').textContent = rows.length+' report'+(rows.length===1?'':'s')+' on record';
 
-  const val = r => metric==='__output'? workDone(r) : (typeof r.metrics[metric]==='number'? r.metrics[metric]:0);
-  const metricLabel = metric==='__output'?'Work done' : (O.METRIC_INDEX[metric]? O.METRIC_INDEX[metric].metric.label : metric);
+  const perScore = r => scoreLeader([r], role, 1).total;   // per-report score (null if no metrics that day)
+  const isScore = metric==='__score';
+  const val = r => isScore ? (perScore(r)===null?0:perScore(r)) : (typeof r.metrics[metric]==='number'? r.metrics[metric]:0);
+  const metricLabel = isScore ? 'Productivity score' : (O.METRIC_INDEX[metric]? O.METRIC_INDEX[metric].metric.label : metric);
 
-  // KPIs
-  const total = rows.reduce((s,r)=>s+val(r),0);
+  // headline KPIs — score-led, plus a concrete drill-down
+  const scored = rows.map(perScore).filter(s=>s!==null);
+  const avgScore = scored.length? Math.round(scored.reduce((a,b)=>a+b,0)/scored.length) : null;
   const lateN = rows.filter(submissionLate).length;
+  const onTime = rows.length? Math.round((rows.length-lateN)/rows.length*100):0;
+  const kpi4 = isScore
+    ? kpi('Best report', scored.length? Math.max(...scored):'—', 'highest single day')
+    : kpi(metricLabel, rows.reduce((s,r)=>s+val(r),0), 'total · across all reports');
   document.getElementById('hist-kpis').innerHTML = `
     ${kpi('Reports', rows.length, 'all time')}
-    ${kpi(metricLabel+' total', total, 'across all reports')}
-    ${kpi('Avg / report', rows.length? (total/rows.length).toFixed(1):'0', metricLabel.toLowerCase())}
-    ${kpi('On-time rate', rows.length? Math.round((rows.length-lateN)/rows.length*100)+'%':'—', lateN+' late (after 9pm)', lateN?'amber':'green')}`;
+    ${kpi('Productivity score', avgScore===null?'—':avgScore, scored.length? 'avg score':'no metrics yet', avgScore===null?undefined:(avgScore>=75?'green':avgScore>=50?'amber':'red'))}
+    ${kpi('On-time rate', rows.length? onTime+'%':'—', lateN+' late (after 9pm)', lateN?'amber':'green')}
+    ${kpi4}`;
 
-  // trend sparkline
+  // trend sparkline (defaults to score over time)
   document.getElementById('hist-trend-lab').textContent = metricLabel+' trend';
   const maxV = Math.max(1,...rows.map(val));
   document.getElementById('hist-spark').innerHTML = rows.map(r=>{
+    const notScored = isScore && perScore(r)===null;
     const h = val(r)/maxV*100;
-    return `<div class="spark__col" style="height:${Math.max(4,h)}%" title="${r.report_date}: ${val(r)}"></div>`;
+    return `<div class="spark__col" style="height:${Math.max(4,h)}%;${notScored?'opacity:.3':''}" title="${r.report_date}: ${notScored?'not scored':val(r)}"></div>`;
   }).join('') || '<p class="empty">No reports yet.</p>';
   document.getElementById('hist-spark-x').innerHTML = rows.length? `<span>${rows[0].report_date}</span><span>${rows[rows.length-1].report_date}</span>`:'';
 
   // monthly summary
   const byMonth = {};
   rows.forEach(r=>{ const k=O.monthKey(r.report_date); (byMonth[k]=byMonth[k]||[]).push(r); });
+  const aggLabel = isScore ? 'Avg score' : (metricLabel+' total');
   document.getElementById('hist-month').innerHTML =
-    `<thead><tr><th>Month</th><th class="num">Reports</th><th class="num">${metricLabel}</th><th class="num">Avg/report</th><th class="num">Activities</th></tr></thead>
+    `<thead><tr><th>Month</th><th class="num">Reports</th><th class="num">${aggLabel}</th><th class="num">On-time</th></tr></thead>
      <tbody>${Object.keys(byMonth).sort().reverse().map(k=>{
-       const rr=byMonth[k]; const tot=rr.reduce((s,r)=>s+val(r),0); const acts=rr.reduce((s,r)=>s+(r.activities||[]).length,0);
-       return `<tr><td class="name">${k}</td><td class="num">${rr.length}</td><td class="num">${tot}</td><td class="num">${(tot/rr.length).toFixed(1)}</td><td class="num">${acts}</td></tr>`;
+       const rr=byMonth[k]; const lateM=rr.filter(submissionLate).length;
+       let agg; if(isScore){ const sc=rr.map(perScore).filter(s=>s!==null); agg=sc.length? Math.round(sc.reduce((a,b)=>a+b,0)/sc.length):'—'; } else { agg=rr.reduce((s,r)=>s+val(r),0); }
+       return `<tr><td class="name">${k}</td><td class="num">${rr.length}</td><td class="num">${agg}</td><td class="num">${Math.round((rr.length-lateM)/rr.length*100)}%</td></tr>`;
      }).join('')}</tbody>`;
 
   // report list (expandable)
@@ -629,7 +640,7 @@ function renderHistory(){
         <span class="spacer"></span>
         ${actions}
         <span class="badge ${lateSub?'badge--amber':'badge--green'}">${lateSub?'Late':'On time'}</span>
-        <span class="badge badge--blue">Work ${workDone(r)}</span>
+        ${(()=>{ const ps=perScore(r); return `<span class="badge badge--blue">${ps===null?'Not scored':'Score '+ps}</span>`; })()}
       </div>
       <div class="rep-body">
         <div class="divider"></div>
